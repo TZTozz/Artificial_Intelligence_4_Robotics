@@ -34,15 +34,15 @@
     ; ---- Valve diagnostic ------
     ; If the valve is open and the pressure in the first one is not changing triggers the checking of the second tank
     (:action trigger_second_tank
-        :parameters (?v1 - valve ?t_from - tank ?t_to - tank)
+        :parameters (?v - valve ?t_from - tank ?t_to - tank)
         :precondition (and 
-            (is_open ?v1) 
-            (valve_connect ?v1 ?t_from ?t_to)
+            (is_open ?v) 
+            (valve_connect ?v ?t_from ?t_to)
             (not (changing_pressure ?t_from))
-            (not (needs_checking ?t_to ?v1))
-            (not (valve_ok ?v1)))
+            (not (needs_checking ?t_to ?v))
+            (not (valve_ok ?v)))
         :effect (and 
-            (needs_checking ?t_to ?v1))
+            (needs_checking ?t_to ?v))
     )
 
     (:action diagnose_pressure_sensor
@@ -64,12 +64,12 @@
             (needs_checking ?t_to ?v)
             (not (changing_pressure ?t_to)))
         :effect (and 
-            (not (needs_checking ?t_to))
+            (not (needs_checking ?t_to ?v))
             (needs_unstuck_valve ?v)
             (diagnosis_valve_complete ?v))
     )
     
-    
+    ; ------------- Physical action --------------  
     (:action unstuck_valve
         :parameters (?v - valve ?l - location)
         :precondition (and 
@@ -81,7 +81,17 @@
             (not (needs_unstuck_valve ?v)))
     )
 
-    ; ------------- Physical action --------------
+    (:action replace_pressure_sensor
+        :parameters (?t - tank ?l - location)
+        :precondition (and 
+            (robot-at ?l)
+            (tank_at ?t ?l)
+            (needs_sensor_replacement ?t))
+        :effect (and 
+            (not (needs_sensor_replacement ?t))
+            (valve_ok))             ;; Qui mettere il fatto che deve rifare il check e vedere sìcome rendere più generale il ripiazzamento
+    )
+    
 
     (:action move
         :parameters (?l1 ?l2 - location)
@@ -96,9 +106,9 @@
 
     ;----- Evrithing is ok -----
     (:action checking_everything
-        :parameters (?v1)
+        :parameters (?v - valve)
         :precondition (and 
-            (valve_ok ?v1))
+            (valve_ok ?v))
         :effect (and 
             (everything_ok))
     )
