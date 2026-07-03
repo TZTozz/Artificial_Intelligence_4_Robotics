@@ -1,7 +1,7 @@
 (
     define (domain Orbital_domain)
     
-    (:requirements :strips :typing :negative-preconditions)
+    (:requirements :strips :typing :negative-preconditions :quantified-preconditions)
 
     (:types
         location
@@ -13,7 +13,8 @@
     (:predicates
         (robot-at ?l - location)
         (is_connected ?l1 - location ?l2 - location)
-        (valve_at ?v ?l)
+        (valve_at ?v - valve ?l - location)
+        (tank_at ?t - tank ?l - location)
         (valve_connect ?v - valve ?t_from - tank ?t_to - tank)
         (is_open ?v - valve)
         (changing_pressure ?t - tank)
@@ -22,7 +23,10 @@
         (needs_sensor_replacement ?t - tank)
         (needs_unstuck_valve ?v - valve)
         (diagnosis_valve_complete ?v - valve)       ; Discovered the problem
+
         (valve_ok ?v - valve)                       ; Problem solved
+        (tank_ok ?t - tank)
+
 
         (everything_ok)
 
@@ -33,7 +37,7 @@
 
     ; ---- Valve diagnostic ------
     ; If the valve is open and the pressure in the first one is not changing triggers the checking of the second tank
-    (:action trigger_second_tank
+    (:action start_valve_diagnostic
         :parameters (?v - valve ?t_from - tank ?t_to - tank)
         :precondition (and 
             (is_open ?v) 
@@ -53,6 +57,8 @@
             (changing_pressure ?t_to))
         :effect (and 
             (not (needs_checking ?t_to ?v))
+            (valve_ok ?v)
+            (tank_ok ?t_to)
             (needs_sensor_replacement ?t_from)
             (diagnosis_valve_complete ?v))
     )
@@ -65,6 +71,8 @@
             (not (changing_pressure ?t_to)))
         :effect (and 
             (not (needs_checking ?t_to ?v))
+            (tank_ok ?t_from)
+            (tank_ok ?t_to)
             (needs_unstuck_valve ?v)
             (diagnosis_valve_complete ?v))
     )
@@ -89,7 +97,7 @@
             (needs_sensor_replacement ?t))
         :effect (and 
             (not (needs_sensor_replacement ?t))
-            (valve_ok))             ;; Qui mettere il fatto che deve rifare il check e vedere sìcome rendere più generale il ripiazzamento
+            (tank_ok ?t))
     )
     
 
@@ -106,9 +114,10 @@
 
     ;----- Evrithing is ok -----
     (:action checking_everything
-        :parameters (?v - valve)
+        :parameters ()
         :precondition (and 
-            (valve_ok ?v))
+            (forall (?v - valve) (valve_ok ?v))
+            (forall (?t - tank) (tank_ok ?t)))
         :effect (and 
             (everything_ok))
     )
