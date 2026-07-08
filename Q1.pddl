@@ -20,9 +20,9 @@
     (is_open valve1)
     (is_open valve2)
 
-    ;(changing_pressure tank1)
+    (changing_pressure tank1)
     ;(changing_pressure tank2)
-    (changing_pressure tank4)
+    ;(changing_pressure tank4)
 )
 
 (:goal (and
