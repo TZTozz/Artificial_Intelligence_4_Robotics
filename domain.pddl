@@ -7,7 +7,7 @@
         location
         valve
         tank
-
+        sensor
     )
 
     (:predicates
@@ -15,18 +15,17 @@
         (is_connected ?l1 - location ?l2 - location)
         (valve_at ?v - valve ?l - location)
         (tank_at ?t - tank ?l - location)
-        (valve_connect ?v - valve ?t_from - tank ?t_to - tank)
+        (valve_connect ?v - valve ?t1 - tank ?t2 - tank)
         (is_open ?v - valve)
-        (changing_pressure ?t - tank)
 
-        (needs_checking ?t - tank ?v - valve)
-        (needs_routine_checking ?t - tank ?v - valve)
-        (needs_sensor_replacement ?t - tank)
+        (changing_pressure ?s - sensor)
+        (monitor ?s - sensor ?t - tank)
+
+        (needs_sensor_replacement ?s - sensor)
         (needs_unstuck_valve ?v - valve)
-        (diagnosis_valve_complete ?v - valve)       ; Discovered the problem
 
         (valve_ok ?v - valve)                       ; Problem solved
-        (tank_ok ?t - tank)
+        (sensor_ok ?s - sensor)
 
 
         (everything_ok)
@@ -38,112 +37,82 @@
 
     ; ---- Valve diagnostic ------
     ; If the valve is open and the pressure in the first one is not changing triggers the checking of the second tank
-    (:action start_valve_diagnostic_no_changing
-        :parameters (?v - valve ?t_from - tank ?t_to - tank)
+    (:action start_pressure_sensor_diagnostic
+        :parameters (?v - valve ?t1 ?t2 - tank ?s1 ?s2 - sensor)
         :precondition (and 
             (is_open ?v) 
-            (valve_connect ?v ?t_from ?t_to)
-            (not (changing_pressure ?t_from))
-            (not (needs_checking ?t_to ?v))
-            (not (valve_ok ?v)))
+            (valve_connect ?v ?t1 ?t2)
+            (monitor ?s1 ?t1)
+            (monitor ?s2 ?t2)
+            (not (valve_ok ?v))
+
+            (not (changing_pressure ?s1))
+            (changing_pressure ?s2))
         :effect (and 
-            (needs_checking ?t_to ?v))
+            (needs_sensor_replacement ?s1))
     )
 
-    (:action start_valve_diagnostic_changing
-        :parameters (?v - valve ?t_from - tank ?t_to - tank)
+    (:action start_valve_diagnostic
+        :parameters (?v - valve ?t1 ?t2 - tank ?s1 ?s2 - sensor)
         :precondition (and 
             (is_open ?v) 
-            (valve_connect ?v ?t_from ?t_to)
-            (changing_pressure ?t_from)
-            (not (needs_checking ?t_to ?v))
-            (not (valve_ok ?v)))
+            (valve_connect ?v ?t1 ?t2)
+            (monitor ?s1 ?t1)
+            (monitor ?s2 ?t2)
+            (not (valve_ok ?v))
+
+            (not (changing_pressure ?s1))
+            (not (changing_pressure ?s2)))
         :effect (and 
-            (needs_routine_checking ?t_to ?v))
+            (needs_unstuck_valve ?v))
     )
 
+
+    (:action valve_diagnostic_ok
+        :parameters (?v - valve ?t1 ?t2 - tank ?s1 ?s2 - sensor)
+        :precondition (and 
+            (is_open ?v) 
+            (valve_connect ?v ?t1 ?t2)
+            (monitor ?s1 ?t1)
+            (monitor ?s2 ?t2)
+            (not (valve_ok ?v))
+
+            (changing_pressure ?s1)
+            (changing_pressure ?s2))
+        :effect (and 
+            (valve_ok ?v)
+            (sensor_ok ?s1)
+            (sensor_ok ?s2))
+    )
     
-
-    (:action diagnose_pressure_first_sensor
-        :parameters (?v - valve ?t_from - tank ?t_to - tank)
-        :precondition (and 
-            (valve_connect ?v ?t_from ?t_to)
-            (needs_checking ?t_to ?v)
-            (changing_pressure ?t_to))
-        :effect (and 
-            (not (needs_checking ?t_to ?v))
-            (valve_ok ?v)
-            (tank_ok ?t_to)
-            (needs_sensor_replacement ?t_from)
-            (diagnosis_valve_complete ?v))
-    )
-
-    (:action diagnose_valve_stuck
-        :parameters (?v - valve ?t_from - tank ?t_to - tank)
-        :precondition (and 
-            (valve_connect ?v ?t_from ?t_to)
-            (needs_checking ?t_to ?v)
-            (not (changing_pressure ?t_to)))
-        :effect (and 
-            (not (needs_checking ?t_to ?v))
-            (tank_ok ?t_from)
-            (tank_ok ?t_to)
-            (needs_unstuck_valve ?v)
-            (diagnosis_valve_complete ?v))
-    )
-
-    (:action diagnose_valve_routine
-        :parameters (?v - valve ?t_from - tank ?t_to - tank)
-        :precondition (and 
-            (valve_connect ?v ?t_from ?t_to)
-            (needs_routine_checking ?t_to ?v)
-            (changing_pressure ?t_to))
-        :effect (and 
-            (not (needs_routine_checking ?t_to ?v))
-            (valve_ok ?v)
-            (tank_ok ?t_from)
-            (tank_ok ?t_to)
-            (diagnosis_valve_complete ?v))
-    )
-
-    (:action diagnose_pressure_second_sensor
-        :parameters (?v - valve ?t_from - tank ?t_to - tank)
-        :precondition (and 
-            (valve_connect ?v ?t_from ?t_to)
-            (needs_routine_checking ?t_to ?v)
-            (not (changing_pressure ?t_to)))
-        :effect (and 
-            (not (needs_routine_checking ?t_to ?v))
-            (tank_ok ?t_from)
-            (valve_ok ?v)
-            (needs_sensor_replacement ?t_to)
-            (diagnosis_valve_complete ?v))
-    )
 
     
     ; ------------- Physical action --------------  
     (:action unstuck_valve
-        :parameters (?v - valve ?l - location ?t_from ?t_to - tank)
+        :parameters (?v - valve ?l - location ?t1 ?t2 - tank ?s1 ?s2 - sensor)
         :precondition (and 
             (needs_unstuck_valve ?v)
             (valve_at ?v ?l)
-            (valve_connect ?v ?t_from ?t_to)
+            (valve_connect ?v ?t1 ?t2)
+            (monitor ?s1 ?t1)
+            (monitor ?s2 ?t2)
             (robot-at ?l))
         :effect (and
             (not (needs_unstuck_valve ?v))
-            (changing_pressure ?t_from)
-            (changing_pressure ?t_to))
+            (changing_pressure ?s1)
+            (changing_pressure ?s2))
     )
 
     (:action replace_pressure_sensor
-        :parameters (?t - tank ?l - location)
+        :parameters (?t - tank ?l - location ?s - sensor)
         :precondition (and 
             (robot-at ?l)
             (tank_at ?t ?l)
-            (needs_sensor_replacement ?t))
+            (monitor ?s ?t)
+            (needs_sensor_replacement ?s))
         :effect (and 
-            (not (needs_sensor_replacement ?t))
-            (changing_pressure ?t))
+            (not (needs_sensor_replacement ?s))
+            (changing_pressure ?s))
     )
     
 
@@ -163,7 +132,7 @@
         :parameters ()
         :precondition (and 
             (forall (?v - valve) (valve_ok ?v))
-            (forall (?t - tank) (tank_ok ?t)))
+            (forall (?s - sensor) (sensor_ok ?s)))
         :effect (and 
             (everything_ok))
     )
