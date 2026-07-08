@@ -28,7 +28,7 @@
     (monitor sensor3 tank3) (monitor sensor4 tank4)
     
     (is_open valve1)
-    (is_open valve2)
+    ;(is_open valve2)
 
     (changing_pressure sensor1)
     ;(changing_pressure sensor2)
