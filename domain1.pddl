@@ -23,6 +23,7 @@
         (is_open ?v - valve)
         (has_size ?obj - object ?sz - size)
         (needs_isolation ?t - tank)
+        (warehause_location ?l - location)
 
         ;; ---------------- manipulation ----------------
         (hand_empty)
@@ -59,7 +60,7 @@
     )
 
 
-    ; ================= Diagnostic reasoning =================
+    ; ------------------ Diagnostic reasoning -----------------
     (:action run_diagnostic_valve_stuck
         :parameters (?v - valve ?t1 ?t2 - tank ?s1 ?s2 - sensor ?test - diagnostic_test ?f - fault ?sy - symptom)
         :precondition (and 
@@ -106,7 +107,7 @@
         )
     )
 
-    
+
     (:action run_diagnostic_valve_clear
         :parameters (?v - valve ?t1 ?t2 - tank ?s1 ?s2 - sensor ?test - diagnostic_test ?sy_fault - symptom)
         :precondition (and 
@@ -131,7 +132,7 @@
 
 
     (:action run_diagnostic_sensor_clear
-        :parameters (?s_target ?s_other - sensor ?v - valve ?t1 ?t2 - tank ?test - diagnostic_test ?sy_fault - symptom)
+        :parameters (?s_target ?s_other - sensor ?v - valve ?t1 ?t2 - tank ?test - diagnostic_test ?sy_fault ?sy_target ?sy_other - symptom)
         :precondition (and 
             (applicable_test ?test ?s_target)
             (not (test_done ?test ?s_target))
@@ -141,10 +142,14 @@
             (valve_connect ?v ?t1 ?t2)
             (monitor ?s_target ?t1)
             (monitor ?s_other ?t2)
-            (not (= ?s_target ?s_other))
 
             (not (shows ?s_target ?sy_fault))
             (not (shows ?s_other ?sy_fault))
+
+            (or 
+                (and (not (= ?sy_target ?sy_fault)) (not (= ?sy_other ?sy_fault)))
+                (= ?sy_target ?sy_other)
+            )
         )
         :effect (and 
             (test_done ?test ?s_target)
@@ -178,7 +183,7 @@
     )
 
 
-    ; ================= Recovery actions =================
+    ; ------------------ Recovery actions ------------------
 
     (:action apply_mechanical_recovery
         :parameters (?r - recovery_action ?f - fault ?v - valve ?l - location ?tool - tool ?size_needed - size ?s1 ?s2 - sensor ?t1 ?t2 - tank ?sy_old ?sy_new - symptom)
@@ -212,7 +217,7 @@
     )
 
     (:action apply_replacement_recovery
-        :parameters (?r - recovery_action ?f - fault ?s_old ?s_new - sensor ?t - tank ?l - location)
+        :parameters (?r - recovery_action ?f - fault ?s_old ?s_new - sensor ?t - tank ?l - location ?sy_old ?sy_new - symptom)
         :precondition (and
             (confirmed_fault ?s_old ?f)
             (fixed_by ?r ?f)
@@ -225,6 +230,9 @@
             (forall (?v - valve ?t_other - tank)
                 (or (not (valve_connect ?v ?t ?t_other))
                     (not (is_open ?v))))
+            (shows ?s_old ?sy_old)
+            (recovery_clears_symptom ?r ?sy_old)
+            (recovery_sets_symptom ?r ?sy_new)
         )
         :effect (and
             (not (confirmed_fault ?s_old ?f))
@@ -232,11 +240,13 @@
             (not (monitor ?s_old ?t))
             (monitor ?s_new ?t)
             (not (has_item ?s_new))
-            (hand_empty)
+            (has_item ?s_old)
             (not (needs_isolation ?t))
             (recovery_done ?r ?s_new)
             (forall (?t2 - diagnostic_test)
                 (and (not (test_done ?t2 ?s_old))))
+            (not (shows ?s_old ?sy_old))
+            (shows ?s_new ?sy_new)
         )
     )
 
@@ -257,7 +267,7 @@
     )
 
 
-    ; ================= Robot actions =================
+    ; ------------------ Robot actions ------------------
     (:action move
         :parameters (?l1 ?l2 - location)
         :precondition (and
@@ -279,6 +289,7 @@
             (hand_empty)
             (not (exists (?f - fault) (and (confirmed_fault ?v ?f) (fault_prevents_movement ?f))))
             (valve_connect ?v ?t1 ?t2)
+            
         )
         :effect (and
             (not (is_open ?v))
@@ -293,7 +304,19 @@
             (valve_connect ?v ?t1 ?t2)
             (not (is_open ?v))
             (hand_empty)
-            (not (exists (?f - fault) (and (confirmed_fault ?v ?f) (fault_prevents_movement ?f))))
+            (not (exists (?f - fault) 
+                (and 
+                    (or (confirmed_fault ?v ?f) (possible_fault ?v ?f)) 
+                    (fault_prevents_movement ?f)
+                )
+            ))
+            (forall (?test - diagnostic_test)
+                (or 
+                    (not (applicable_test ?test ?v))
+                    (not (test_requires_closed ?test))
+                    (test_done ?test ?v)
+                )
+            )
         )
         :effect (and
             (is_open ?v)
@@ -321,6 +344,7 @@
         :precondition (and
             (has_item ?item)
             (robot-at ?l)
+            (warehause_location ?l)
         )
         :effect (and
             (not (has_item ?item))

@@ -21,6 +21,7 @@
     (component_at valve2 loc2)
     (tank_at tank1 loc2) (tank_at tank2 loc3)
     (tank_at tank3 loc1) (tank_at tank4 loc3)
+    (warehause_location loc3)
     (item_at spare_sensor loc3)
     (is_spare spare_sensor)
     (has_size valve1 small) (has_size valve2 large)
@@ -34,7 +35,7 @@
     (monitor sensor1 tank1) (monitor sensor2 tank2)
     (monitor sensor3 tank3) (monitor sensor4 tank4)
 
-    (is_open valve1)
+    ;(is_open valve1)
     (is_open valve2)
     
 
@@ -45,10 +46,7 @@
     (hand_empty)
 
     ;; ---------------- diagnostic knowledge base ----------------
-    ;; Only the test relevant to each valve's expected operating regime in
-    ;; this scenario is declared applicable, so no state-flip is needed just
-    ;; to satisfy the "every applicable test done" check.
-    (applicable_test open_valve_test valve1)
+    (applicable_test closed_valve_test valve1)
     (applicable_test open_valve_test valve2)
     (applicable_test sensor_self_test sensor1)
     (applicable_test sensor_self_test sensor2)
@@ -76,6 +74,7 @@
     (test_indicates sensor_comparison_test sensor_dead_fault)
 
     (fault_prevents_movement valve_stuck_fault)
+    (fault_prevents_movement valve_leak_fault)
 
     (fixed_by unstuck_fix valve_stuck_fault)
     (fixed_by tighten_fix valve_leak_fault)
@@ -87,16 +86,16 @@
     (recovery_requires_closed tighten_fix)
     (recovery_requires_spare replace_fix)
 
-    ;; unstuck_fix physically restores expected pressure movement;
-    ;; tighten_fix physically stops the leak-induced movement.
     (recovery_clears_symptom unstuck_fix pressure_stable)
     (recovery_sets_symptom unstuck_fix pressure_changing)
     (recovery_clears_symptom tighten_fix pressure_changing)
     (recovery_sets_symptom tighten_fix pressure_stable)
+    (recovery_clears_symptom replace_fix erratic_reading)
+    (recovery_sets_symptom replace_fix pressure_changing)
 
     ;; ---------------- observed symptoms ----------------
-    (shows sensor1 pressure_stable)
-    (shows sensor2 pressure_stable)
+    (shows sensor1 pressure_changing)
+    (shows sensor2 pressure_changing)
     (shows sensor3 pressure_changing)
     (shows sensor4 pressure_stable)
 
