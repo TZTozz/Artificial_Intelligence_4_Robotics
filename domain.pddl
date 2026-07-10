@@ -1,5 +1,5 @@
 (
-    define (domain Orbital_domain)
+    define (domain Orbital_domain_old)
     
     (:requirements :strips :typing :negative-preconditions :quantified-preconditions :equality :disjunctive-preconditions )
 

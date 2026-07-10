@@ -1,4 +1,4 @@
-(define (problem Q1) (:domain Orbital_domain)
+(define (problem Q1) (:domain Orbital_domain_old)
 (:objects
     loc1 loc2 loc3 - location
     valve1 valve2 - valve
