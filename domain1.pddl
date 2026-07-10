@@ -61,69 +61,24 @@
 
     ; ================= Diagnostic reasoning =================
     (:action run_diagnostic_valve_stuck
-        :parameters (?v - valve ?t1 ?t2 - tank ?s1 ?s2 - sensor ?test - diagnostic_test ?f - fault ?sy_stable - symptom)
+        :parameters (?v - valve ?t1 ?t2 - tank ?s1 ?s2 - sensor ?test - diagnostic_test ?f - fault ?sy - symptom)
         :precondition (and 
             (applicable_test ?test ?v)
             (not (test_done ?test ?v))
             (test_indicates ?test ?f) 
-            (test_requires_symptom ?test ?sy_stable) 
-            
-            (is_open ?v) 
-            (valve_connect ?v ?t1 ?t2)
-            (monitor ?s1 ?t1)
-            (monitor ?s2 ?t2)
-            (not (= ?s1 ?s2))
-
-            (shows ?s1 ?sy_stable)
-            (shows ?s2 ?sy_stable)
-        )
-        :effect (and 
-            (possible_fault ?v ?f)
-            (test_done ?test ?v)
-        )
-    )
-
-    (:action run_diagnostic_valve_leak
-        :parameters (?v - valve ?t1 ?t2 - tank ?s1 ?s2 - sensor ?test - diagnostic_test ?f - fault ?sy_changing - symptom)
-        :precondition (and 
-            (applicable_test ?test ?v)
-            (not (test_done ?test ?v))
-            (test_indicates ?test ?f)
-            (test_requires_symptom ?test ?sy_changing)
-            
-            (not (is_open ?v)) 
-            (valve_connect ?v ?t1 ?t2)
-            (monitor ?s1 ?t1)
-            (monitor ?s2 ?t2)
-            (not (= ?s1 ?s2))
-
-            (or (shows ?s1 ?sy_changing) (shows ?s2 ?sy_changing))
-        )
-        :effect (and 
-            (possible_fault ?v ?f)
-            (test_done ?test ?v)
-        )
-    )
-
-    (:action run_diagnostic_valve_clear
-        :parameters (?v - valve ?t1 ?t2 - tank ?s1 ?s2 - sensor ?test - diagnostic_test ?sy_fault - symptom)
-        :precondition (and 
-            (applicable_test ?test ?v)
-            (not (test_done ?test ?v))
-            (test_requires_symptom ?test ?sy_fault)
+            (test_requires_symptom ?test ?sy) 
             
             (valve_connect ?v ?t1 ?t2)
             (monitor ?s1 ?t1)
             (monitor ?s2 ?t2)
-            (not (= ?s1 ?s2))
-
             (or (not (test_requires_open ?test)) (is_open ?v))
             (or (not (test_requires_closed ?test)) (not (is_open ?v)))
 
-            (not (shows ?s1 ?sy_fault))
-            (not (shows ?s2 ?sy_fault))
+            (shows ?s1 ?sy)
+            (shows ?s2 ?sy)
         )
         :effect (and 
+            (possible_fault ?v ?f)
             (test_done ?test ?v)
         )
     )
@@ -140,7 +95,6 @@
             (valve_connect ?v ?t1 ?t2)
             (monitor ?s_faulty ?t1)
             (monitor ?s_ok ?t2)
-            (not (= ?s_faulty ?s_ok))
 
             (shows ?s_faulty ?sy_faulty)
             (shows ?s_ok ?sy_ok)
@@ -151,6 +105,30 @@
             (test_done ?test ?s_faulty)
         )
     )
+
+    
+    (:action run_diagnostic_valve_clear
+        :parameters (?v - valve ?t1 ?t2 - tank ?s1 ?s2 - sensor ?test - diagnostic_test ?sy_fault - symptom)
+        :precondition (and 
+            (applicable_test ?test ?v)
+            (not (test_done ?test ?v))
+            (test_requires_symptom ?test ?sy_fault)
+            
+            (valve_connect ?v ?t1 ?t2)
+            (monitor ?s1 ?t1)
+            (monitor ?s2 ?t2)
+
+            (or (not (test_requires_open ?test)) (is_open ?v))
+            (or (not (test_requires_closed ?test)) (not (is_open ?v)))
+
+            (not (shows ?s1 ?sy_fault))
+            (not (shows ?s2 ?sy_fault))
+        )
+        :effect (and 
+            (test_done ?test ?v)
+        )
+    )
+
 
     (:action run_diagnostic_sensor_clear
         :parameters (?s_target ?s_other - sensor ?v - valve ?t1 ?t2 - tank ?test - diagnostic_test ?sy_fault - symptom)
@@ -203,7 +181,7 @@
     ; ================= Recovery actions =================
 
     (:action apply_mechanical_recovery
-        :parameters (?r - recovery_action ?f - fault ?v - valve ?l - location ?tool - tool ?size_needed - size ?s - sensor ?t1 ?t2 - tank ?sy_old ?sy_new - symptom)
+        :parameters (?r - recovery_action ?f - fault ?v - valve ?l - location ?tool - tool ?size_needed - size ?s1 ?s2 - sensor ?t1 ?t2 - tank ?sy_old ?sy_new - symptom)
         :precondition (and
             (confirmed_fault ?v ?f)
             (fixed_by ?r ?f)
@@ -216,7 +194,8 @@
             (has_size ?v ?size_needed)
             (or (not (recovery_requires_closed ?r)) (not (is_open ?v)))
             (valve_connect ?v ?t1 ?t2)
-            (monitor ?s ?t1)
+            (monitor ?s1 ?t1)
+            (monitor ?s2 ?t2)
             (recovery_clears_symptom ?r ?sy_old)
             (recovery_sets_symptom ?r ?sy_new)
         )
@@ -224,8 +203,10 @@
             (not (confirmed_fault ?v ?f))
             (not (possible_fault ?v ?f))
             (recovery_done ?r ?v)
-            (not (shows ?s ?sy_old))
-            (shows ?s ?sy_new)
+            (not (shows ?s1 ?sy_old))
+            (shows ?s1 ?sy_new)
+            (not (shows ?s2 ?sy_old))
+            (shows ?s2 ?sy_new)
             (forall (?t - diagnostic_test) (and (not (test_done ?t ?v))))
         )
     )

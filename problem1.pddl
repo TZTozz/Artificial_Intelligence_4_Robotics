@@ -9,9 +9,9 @@
     small medium large - size
 
     ;; --- diagnostic knowledge base objects ---
-    valve_stuck_fault valve_leak_fault sensor_drift_fault - fault
+    valve_stuck_fault valve_leak_fault sensor_crazy_fault sensor_dead_fault - fault
     pressure_changing pressure_stable erratic_reading - symptom
-    open_valve_test closed_valve_test sensor_self_test - diagnostic_test
+    open_valve_test closed_valve_test sensor_self_test sensor_comparison_test - diagnostic_test
     unstuck_fix tighten_fix replace_fix - recovery_action
 )
 
@@ -54,23 +54,33 @@
     (applicable_test sensor_self_test sensor2)
     (applicable_test sensor_self_test sensor3)
     (applicable_test sensor_self_test sensor4)
+    (applicable_test sensor_self_test spare_sensor)
+    (applicable_test sensor_comparison_test sensor1)
+    (applicable_test sensor_comparison_test sensor2)
+    (applicable_test sensor_comparison_test sensor3)
+    (applicable_test sensor_comparison_test sensor4)
+    (applicable_test sensor_comparison_test spare_sensor)
 
+    
     (test_requires_symptom open_valve_test pressure_stable)
     (test_requires_symptom closed_valve_test pressure_changing)
     (test_requires_symptom sensor_self_test erratic_reading)
-
+    (test_requires_symptom sensor_comparison_test pressure_stable)
+    
     (test_requires_open open_valve_test)
     (test_requires_closed closed_valve_test)
 
     (test_indicates open_valve_test valve_stuck_fault)
     (test_indicates closed_valve_test valve_leak_fault)
-    (test_indicates sensor_self_test sensor_drift_fault)
+    (test_indicates sensor_self_test sensor_crazy_fault)
+    (test_indicates sensor_comparison_test sensor_dead_fault)
 
     (fault_prevents_movement valve_stuck_fault)
 
     (fixed_by unstuck_fix valve_stuck_fault)
     (fixed_by tighten_fix valve_leak_fault)
-    (fixed_by replace_fix sensor_drift_fault)
+    (fixed_by replace_fix sensor_crazy_fault)
+    (fixed_by replace_fix sensor_dead_fault)
 
     (recovery_requires_torque unstuck_fix)
     (recovery_requires_torque tighten_fix)
@@ -84,12 +94,9 @@
     (recovery_clears_symptom tighten_fix pressure_changing)
     (recovery_sets_symptom tighten_fix pressure_stable)
 
-    ;; the spare will also need its own health check once installed
-    (applicable_test sensor_self_test spare_sensor)
-
     ;; ---------------- observed symptoms ----------------
     (shows sensor1 pressure_stable)
-    (shows sensor2 pressure_changing)
+    (shows sensor2 pressure_stable)
     (shows sensor3 pressure_changing)
     (shows sensor4 pressure_stable)
 
