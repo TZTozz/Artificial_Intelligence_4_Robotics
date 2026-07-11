@@ -67,6 +67,7 @@
     
     (test_requires_open open_valve_test)
     (test_requires_closed closed_valve_test)
+    (test_requires_neighbor sensor_comparison_test)
 
     (test_indicates open_valve_test valve_stuck_fault)
     (test_indicates closed_valve_test valve_leak_fault)
@@ -91,6 +92,7 @@
     (recovery_clears_symptom tighten_fix pressure_changing)
     (recovery_sets_symptom tighten_fix pressure_stable)
     (recovery_clears_symptom replace_fix erratic_reading)
+    (recovery_clears_symptom replace_fix pressure_stable)
     (recovery_sets_symptom replace_fix pressure_changing)
 
     ;; ---------------- observed symptoms ----------------
