@@ -39,7 +39,7 @@
         (test_requires_symptom ?t - diagnostic_test ?sy - symptom)
         (test_requires_open ?t - diagnostic_test)
         (test_requires_closed ?t - diagnostic_test)
-        (test_requires_neighbor ?t - diagnostic_test)   ; true for tests that must compare against a second sensor across a valve (e.g. sensor_comparison_test); absent/false for standalone tests (e.g. sensor_self_test)
+        (test_requires_neighbor ?t - diagnostic_test)
         (test_indicates ?t - diagnostic_test ?f - fault)
         (fault_prevents_movement ?f - fault)
         (fixed_by ?r - recovery_action ?f - fault)
@@ -50,19 +50,19 @@
         (recovery_sets_symptom ?r - recovery_action ?sy - symptom)
 
         ;; ---------------- dynamic diagnostic state ----------------
-        (shows ?c - component ?sy - symptom)          ; observed symptom
+        (shows ?c - component ?sy - symptom)
         (test_done ?t - diagnostic_test ?c - component)
-        (possible_fault ?c - component ?f - fault)        ; approximate diagnosis
-        (confirmed_fault ?c - component ?f - fault)        ; confirmed diagnosis
+        (possible_fault ?c - component ?f - fault)
+        (confirmed_fault ?c - component ?f - fault)
         (recovery_done ?r - recovery_action ?c - component)
-        (component_ok ?c - component)                      ; verified fixed / healthy
+        (component_ok ?c - component)
 
         (everything_ok)
     )
 
 
-    ;; ----------------------- Diagnostic reasoning ----------------------
-    ;----------Start---------
+    ; --------------------------- Diagnostic reasoning -------------------------
+    ;-----------start-----------
     (:action run_diagnostic_valve_stuck
         :parameters (?v - valve ?t1 ?t2 - tank ?s1 ?s2 - sensor ?test - diagnostic_test ?f - fault ?sy - symptom)
         :precondition (and 
@@ -110,7 +110,6 @@
         )
     )
 
-
     (:action run_diagnostic_sensor_self
         :parameters (?s - sensor ?test - diagnostic_test ?f - fault ?sy - symptom)
         :precondition (and
@@ -129,7 +128,7 @@
     )
 
 
-    ;----------Clear---------
+    ;--------------clear-------------
     (:action run_diagnostic_valve_clear
         :parameters (?v - valve ?t1 ?t2 - tank ?s1 ?s2 - sensor ?test - diagnostic_test ?sy_fault - symptom)
         :precondition (and 
@@ -152,27 +151,20 @@
         )
     )
 
-
     (:action run_diagnostic_sensor_clear
-        :parameters (?s_target ?s_other - sensor ?v - valve ?t1 ?t2 - tank ?test - diagnostic_test ?sy_fault ?sy_target ?sy_other - symptom)
+        :parameters (?s_target ?s_other - sensor ?v - valve ?t1 ?t2 - tank ?test - diagnostic_test ?sy_fault - symptom)
         :precondition (and 
             (applicable_test ?test ?s_target)
             (not (test_done ?test ?s_target))
             (test_requires_symptom ?test ?sy_fault)
             (test_requires_neighbor ?test)
             
-            (is_open ?v)
+            ;(is_open ?v)
             (valve_connect ?v ?t1 ?t2)
             (monitor ?s_target ?t1)
             (monitor ?s_other ?t2)
 
-            (not (shows ?s_target ?sy_fault))
-            (not (shows ?s_other ?sy_fault))
-
-            (or 
-                (and (not (= ?sy_target ?sy_fault)) (not (= ?sy_other ?sy_fault)))
-                (= ?sy_target ?sy_other)
-            )
+            (or (not (shows ?s_target ?sy_fault)) (shows ?s_other ?sy_fault))
         )
         :effect (and 
             (test_done ?test ?s_target)
@@ -195,7 +187,7 @@
     )
 
 
-    ;---------Confirm or rule out-------
+    ;------------------confirm or rule out faults----------------
     (:action confirm_fault
         :parameters (?c - component ?f - fault)
         :precondition (and
