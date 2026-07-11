@@ -40,6 +40,7 @@
         (test_requires_open ?t - diagnostic_test)
         (test_requires_closed ?t - diagnostic_test)
         (test_requires_neighbor ?t - diagnostic_test)
+        (unreliable_symptom ?sy - symptom)
         (test_indicates ?t - diagnostic_test ?f - fault)
         (fault_prevents_movement ?f - fault)
         (fixed_by ?r - recovery_action ?f - fault)
@@ -81,6 +82,30 @@
             (shows ?s2 ?sy)
         )
         :effect (and 
+            (possible_fault ?v ?f)
+            (test_done ?test ?v)
+        )
+    )
+
+    (:action run_diagnostic_valve_single_sensor
+        :parameters (?v - valve ?t1 ?t2 - tank ?s ?s_other - sensor ?test - diagnostic_test ?f - fault ?sy ?sy_other - symptom)
+        :precondition (and
+            (applicable_test ?test ?v)
+            (not (test_done ?test ?v))
+            (test_indicates ?test ?f)
+            (test_requires_symptom ?test ?sy)
+
+            (valve_connect ?v ?t1 ?t2)
+            (monitor ?s ?t1)
+            (monitor ?s_other ?t2)
+            (or (not (test_requires_open ?test)) (is_open ?v))
+            (or (not (test_requires_closed ?test)) (not (is_open ?v)))
+
+            (shows ?s ?sy)
+            (shows ?s_other ?sy_other)
+            (unreliable_symptom ?sy_other)
+        )
+        :effect (and
             (possible_fault ?v ?f)
             (test_done ?test ?v)
         )
@@ -159,7 +184,7 @@
             (test_requires_symptom ?test ?sy_fault)
             (test_requires_neighbor ?test)
             
-            ;(is_open ?v)
+            (is_open ?v)
             (valve_connect ?v ?t1 ?t2)
             (monitor ?s_target ?t1)
             (monitor ?s_other ?t2)

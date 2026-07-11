@@ -23,8 +23,8 @@
     (tank_at tank3 loc1) (tank_at tank4 loc3)
     (warehause_location loc3)
     (item_at spare_sensor1 loc3)
-    (item_at spare_sensor2 loc3)
     (is_spare spare_sensor1)
+    (item_at spare_sensor2 loc3)
     (is_spare spare_sensor2)
     (has_size valve1 small) (has_size valve2 large)
 
@@ -72,6 +72,7 @@
     (test_requires_open open_valve_test)
     (test_requires_closed closed_valve_test)
     (test_requires_neighbor sensor_comparison_test)
+    (unreliable_symptom erratic_reading)
 
     (test_indicates open_valve_test valve_stuck_fault)
     (test_indicates closed_valve_test valve_leak_fault)
@@ -102,13 +103,17 @@
     ;; ---------------- observed symptoms ----------------
     (shows sensor1 pressure_changing)
     (shows sensor2 pressure_changing)
-    (shows sensor3 changing_pressure)
+    (shows sensor3 pressure_changing)
     (shows sensor4 erratic_reading)
 
 )
 
 (:goal (and
     (everything_ok)
+    (hand_empty)
+    (forall (?i - item) (or (not (in_toolbox ?i))
+                            (= ?i adjustable_wrench)
+    ))
 ))
 
 )
