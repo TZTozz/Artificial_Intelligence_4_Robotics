@@ -172,10 +172,12 @@
     )
 
     (:action run_diagnostic_sensor_self_clear
-        :parameters (?s - sensor ?test - diagnostic_test ?sy - symptom)
+        :parameters (?s - sensor ?v - valve ?t1 ?t2 - tank ?test - diagnostic_test ?sy - symptom)
         :precondition (and
             (applicable_test ?test ?s)
             (not (test_done ?test ?s))
+            (valve_connect ?v ?t1 ?t2)
+            (monitor ?s ?t1)
             (test_requires_symptom ?test ?sy)
             (not (test_requires_neighbor ?test))
 

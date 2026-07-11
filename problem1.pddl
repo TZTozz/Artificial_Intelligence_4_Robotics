@@ -4,7 +4,7 @@
     loc1 loc2 loc3 - location
     valve1 valve2 - valve
     tank1 tank2 tank3 tank4 - tank
-    sensor1 sensor2 sensor3 sensor4 spare_sensor - sensor
+    sensor1 sensor2 sensor3 sensor4 spare_sensor1 spare_sensor2 - sensor
     adjustable_wrench - tool
     small medium large - size
 
@@ -22,8 +22,10 @@
     (tank_at tank1 loc2) (tank_at tank2 loc3)
     (tank_at tank3 loc1) (tank_at tank4 loc3)
     (warehause_location loc3)
-    (item_at spare_sensor loc3)
-    (is_spare spare_sensor)
+    (item_at spare_sensor1 loc3)
+    (item_at spare_sensor2 loc3)
+    (is_spare spare_sensor1)
+    (is_spare spare_sensor2)
     (has_size valve1 small) (has_size valve2 large)
 
     (is_connected loc1 loc2) (is_connected loc2 loc1)
@@ -36,7 +38,7 @@
     (monitor sensor3 tank3) (monitor sensor4 tank4)
 
     ;(is_open valve1)
-    (is_open valve2)
+    ;(is_open valve2)
     
 
     (can_torque adjustable_wrench)
@@ -47,17 +49,19 @@
 
     ;; ---------------- diagnostic knowledge base ----------------
     (applicable_test closed_valve_test valve1)
-    (applicable_test open_valve_test valve2)
+    (applicable_test closed_valve_test valve2)
     (applicable_test sensor_self_test sensor1)
     (applicable_test sensor_self_test sensor2)
     (applicable_test sensor_self_test sensor3)
     (applicable_test sensor_self_test sensor4)
-    (applicable_test sensor_self_test spare_sensor)
+    (applicable_test sensor_self_test spare_sensor1)
+    (applicable_test sensor_self_test spare_sensor2)
     (applicable_test sensor_comparison_test sensor1)
     (applicable_test sensor_comparison_test sensor2)
     (applicable_test sensor_comparison_test sensor3)
     (applicable_test sensor_comparison_test sensor4)
-    (applicable_test sensor_comparison_test spare_sensor)
+    (applicable_test sensor_comparison_test spare_sensor1)
+    (applicable_test sensor_comparison_test spare_sensor2)
 
     
     (test_requires_symptom open_valve_test pressure_stable)
@@ -98,8 +102,8 @@
     ;; ---------------- observed symptoms ----------------
     (shows sensor1 pressure_changing)
     (shows sensor2 pressure_changing)
-    (shows sensor3 pressure_changing)
-    (shows sensor4 pressure_stable)
+    (shows sensor3 changing_pressure)
+    (shows sensor4 erratic_reading)
 
 )
 
