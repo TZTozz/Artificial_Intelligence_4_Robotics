@@ -1,12 +1,12 @@
 (define (problem Q1) (:domain Orbital_domain_plus)
 
 (:objects
-    loc1 loc2 loc3 - location
+    loc1 - location
     valve1 - valve
     tank1 tank2 - tank
     sensor1 sensor2 spare_sensor1 - sensor
-    adjustable_wrench - tool
     small medium large - size
+
 
     ;; --- diagnostic knowledge base objects ---
     valve_stuck_fault valve_leak_fault sensor_crazy_fault sensor_dead_fault - fault
@@ -15,16 +15,15 @@
 )
 
 (:init
+    (phase_1)
     (robot-at loc1)
-    (component_at valve1 loc2)
-    (tank_at tank1 loc2) (tank_at tank2 loc3)
-    (warehouse_location loc3)
-    (item_at spare_sensor1 loc3)
+
+    (component_at valve1 loc1)
+    (tank_at tank1 loc1) (tank_at tank2 loc1)
+    (warehouse_location loc1)
+    (item_at spare_sensor1 loc1)
     (is_spare spare_sensor1)
     (has_size valve1 small)
-
-    (is_connected loc1 loc2) (is_connected loc2 loc1)
-    (is_connected loc2 loc3) (is_connected loc3 loc2)
 
     (valve_connect valve1 tank1 tank2) (valve_connect valve1 tank2 tank1)
 
@@ -33,11 +32,8 @@
     (is_open valve1)
     
 
-    (can_torque adjustable_wrench)
-    (has_size adjustable_wrench medium)
-    (is_adjustable adjustable_wrench)
-    (in_toolbox adjustable_wrench)
     (hand_empty)
+
 
     ;; ---------------- diagnostic knowledge base ----------------
     (applicable_test open_valve_test valve1)
@@ -89,7 +85,9 @@
     (= (valve_opening valve1) 0.2)
     (= (pressure_threshold) 3.0)
     (= (time) 0.0)
-    (= (flow_coefficient) 0.02)
+    (= (flow_coefficient) 0.005)
+
+
     (= (R_ammonia) 8.314)
     
     (= (pressure tank1) 100.0)
@@ -109,9 +107,11 @@
 (:goal (and
     (everything_ok)
     (hand_empty)
-    (forall (?i - item) (or (not (in_toolbox ?i))
-                            (= ?i adjustable_wrench)
-    ))
+    (forall (?i - item) (not (in_toolbox ?i)))
 ))
+
+
+
+
 
 )

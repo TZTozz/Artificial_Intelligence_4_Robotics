@@ -73,8 +73,12 @@
         (is_truly_open ?v - valve)
 
 
+        (phase_1)
+        (phase_2)
+        (phase_3)
         (everything_ok)
     )
+
 
     (:functions
         (recorded_pressure ?s - sensor)
@@ -94,6 +98,7 @@
     (:action take_baseline_reading
         :parameters (?s - sensor ?t - tank)
         :precondition (and 
+            (or (phase_1) (phase_3))
             (monitor ?s ?t)
             (not (has_baseline ?s))
         )
@@ -110,9 +115,11 @@
     )
 
 
+
     (:action evaluate_pressure_changing
         :parameters (?s - sensor ?t - tank)
         :precondition (and 
+            (or (phase_1) (phase_3))
             (monitor ?s ?t)
             (has_baseline ?s)
             (>= (- (time) (time_recorded ?s)) 3.0)
@@ -122,13 +129,18 @@
             (when (and (not (is_broken ?s))
                        (or (> (- (pressure ?t) (recorded_pressure ?s)) (pressure_threshold))
                            (< (- (pressure ?t) (recorded_pressure ?s)) (- 0 (pressure_threshold)))))
-                (shows ?s pressure_changing)
+                (and (shows ?s pressure_changing)
+                     (not (shows ?s pressure_stable))
+                )
+
             )
             ; Sensor working and stable
             (when (and (not (is_broken ?s))
                        (<= (- (pressure ?t) (recorded_pressure ?s)) (pressure_threshold))
                        (>= (- (pressure ?t) (recorded_pressure ?s)) (- 0 (pressure_threshold))))
-                (shows ?s pressure_stable)
+                (and (shows ?s pressure_stable)
+                     (not (shows ?s pressure_changing))
+                )
             )
             ; Sensor broken
             (when (is_broken ?s) (shows ?s pressure_stable))
@@ -136,6 +148,7 @@
             (checked ?s)
             (not (has_baseline ?s)) 
         )
+
     )
     
 
@@ -199,9 +212,11 @@
 
     (:process advance_time
         :parameters ()
-        :precondition (>= (time) 0.0)
+        :precondition (and (>= (time) 0.0)
+                           (exists (?s - sensor) (has_baseline ?s)))
         :effect (increase (time) (* #t 1.0))
     )
+
     
 
 
@@ -257,6 +272,7 @@
     (:action run_diagnostic_sensor_discrepancy
         :parameters (?s_faulty ?s_ok - sensor ?v - valve ?t1 ?t2 - tank ?test - diagnostic_test ?f - fault ?sy_faulty ?sy_ok - symptom)
         :precondition (and 
+            (phase_1)
             (applicable_test ?test ?s_faulty)
             (not (test_done ?test ?s_faulty))
             (test_indicates ?test ?f)
@@ -277,6 +293,7 @@
             (test_done ?test ?s_faulty)
         )
     )
+
 
     (:action run_diagnostic_sensor_self
         :parameters (?s - sensor ?test - diagnostic_test ?f - fault ?sy - symptom)
@@ -365,6 +382,7 @@
     (:action confirm_fault
         :parameters (?c - component ?f - fault)
         :precondition (and
+            (phase_1)
             (possible_fault ?c ?f)
             (not (confirmed_fault ?c ?f))
             (forall (?t - diagnostic_test)
@@ -372,13 +390,17 @@
         )
         :effect (and
             (confirmed_fault ?c ?f)
+            (not (phase_1))
+            (phase_2)
         )
     )
+
 
     (:action rule_out_fault
         :parameters (?c - component)
         :precondition (and
             (not (component_ok ?c))
+            (forall (?s - sensor) (or (not (= ?c ?s)) (not (is_broken ?s))))
             (not (exists (?f - fault) (or (possible_fault ?c ?f) (confirmed_fault ?c ?f))))
             (forall (?t - diagnostic_test)
                 (or (not (applicable_test ?t ?c)) (test_done ?t ?c)))
@@ -387,6 +409,7 @@
             (component_ok ?c)
         )
     )
+
 
 
     ; ------------------ Recovery actions ------------------
@@ -425,6 +448,7 @@
     (:action apply_replacement_recovery
         :parameters (?r - recovery_action ?f - fault ?s_old ?s_new - sensor ?t - tank ?l - location ?sy_old ?sy_new - symptom)
         :precondition (and
+            (phase_2)
             (confirmed_fault ?s_old ?f)
             (fixed_by ?r ?f)
             (recovery_requires_spare ?r)
@@ -453,13 +477,17 @@
                 (and (not (test_done ?t2 ?s_old))))
             (not (shows ?s_old ?sy_old))
             (shows ?s_new ?sy_new)
+            (not (phase_2))
+            (phase_3)
         )
     )
+
 
     
     (:action verify_repair
         :parameters (?c - component ?r - recovery_action ?f - fault)
         :precondition (and
+            (phase_3)
             (recovery_done ?r ?c)
             (fixed_by ?r ?f)
             (not (exists (?f2 - fault) (or (possible_fault ?c ?f2) (confirmed_fault ?c ?f2))))
@@ -471,6 +499,7 @@
             (not (recovery_done ?r ?c))
         )
     )
+
 
 
     ; ------------------ Robot actions ------------------
@@ -489,6 +518,7 @@
     (:action close_valve
         :parameters (?v - valve ?l - location ?t1 ?t2 - tank)
         :precondition (and
+            (or (phase_2) (phase_3))
             (robot-at ?l)
             (component_at ?v ?l)
             (is_open ?v)
@@ -503,9 +533,11 @@
         )
     )
 
+
     (:action open_valve
         :parameters (?v - valve ?l - location ?t1 ?t2 - tank)
         :precondition (and
+            (phase_3)
             (robot-at ?l)
             (component_at ?v ?l)
             (valve_connect ?v ?t1 ?t2)
@@ -513,15 +545,15 @@
             (hand_empty)
             (not (exists (?f - fault) 
                 (and 
-                    (or (confirmed_fault ?v ?f) (possible_fault ?v ?f)) 
-                    (fault_prevents_movement ?f)
+                     (or (confirmed_fault ?v ?f) (possible_fault ?v ?f)) 
+                     (fault_prevents_movement ?f)
                 )
             ))
             (forall (?test - diagnostic_test)
                 (or 
-                    (not (applicable_test ?test ?v))
-                    (not (test_requires_closed ?test))
-                    (test_done ?test ?v)
+                     (not (applicable_test ?test ?v))
+                     (not (test_requires_closed ?test))
+                     (test_done ?test ?v)
                 )
             )
         )
@@ -532,10 +564,12 @@
     )
 
 
+
     ;; -------- Manipulate object actions --------
     (:action pick_up_item
         :parameters (?item - item ?l - location)
         :precondition (and
+            (phase_2)
             (robot-at ?l)
             (item_at ?item ?l)
             (hand_empty)
@@ -547,9 +581,11 @@
         )
     )
 
+
     (:action release_item
         :parameters (?item - item ?l - location)
         :precondition (and
+            (or (phase_2) (phase_3))
             (has_item ?item)
             (robot-at ?l)
             (warehouse_location ?l)
@@ -560,6 +596,8 @@
             (hand_empty)
         )
     )
+
+
 
     (:action adjust_tool
         :parameters (?tool - tool ?comp - object ?tool_size - size ?comp_size - size)
