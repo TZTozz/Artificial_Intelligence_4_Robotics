@@ -1,4 +1,4 @@
-(define (problem Q1) (:domain Orbital_domain)
+(define (problem Q1) (:domain Orbital_domain_plus)
 
 (:objects
     loc1 loc2 loc3 - location
@@ -10,7 +10,6 @@
 
     ;; --- diagnostic knowledge base objects ---
     valve_stuck_fault valve_leak_fault sensor_crazy_fault sensor_dead_fault - fault
-    pressure_changing pressure_stable erratic_reading - symptom
     open_valve_test closed_valve_test sensor_self_test sensor_comparison_test - diagnostic_test
     unstuck_fix tighten_fix replace_fix - recovery_action
 )
@@ -18,24 +17,18 @@
 (:init
     (robot-at loc1)
     (component_at valve1 loc2)
-    (component_at valve2 loc2)
     (tank_at tank1 loc2) (tank_at tank2 loc3)
-    (tank_at tank3 loc1) (tank_at tank4 loc3)
-    (warehause_location loc3)
+    (warehouse_location loc3)
     (item_at spare_sensor1 loc3)
     (is_spare spare_sensor1)
-    (item_at spare_sensor2 loc3)
-    (is_spare spare_sensor2)
-    (has_size valve1 small) (has_size valve2 large)
+    (has_size valve1 small)
 
     (is_connected loc1 loc2) (is_connected loc2 loc1)
     (is_connected loc2 loc3) (is_connected loc3 loc2)
 
     (valve_connect valve1 tank1 tank2) (valve_connect valve1 tank2 tank1)
-    (valve_connect valve2 tank3 tank4) (valve_connect valve2 tank4 tank3)
 
     (monitor sensor1 tank1) (monitor sensor2 tank2)
-    (monitor sensor3 tank3) (monitor sensor4 tank4)
 
     (is_open valve1)
     ;(is_open valve2)
@@ -49,19 +42,13 @@
 
     ;; ---------------- diagnostic knowledge base ----------------
     (applicable_test open_valve_test valve1)
-    (applicable_test closed_valve_test valve2)
     (applicable_test sensor_self_test sensor1)
     (applicable_test sensor_self_test sensor2)
-    (applicable_test sensor_self_test sensor3)
-    (applicable_test sensor_self_test sensor4)
     (applicable_test sensor_self_test spare_sensor1)
     (applicable_test sensor_self_test spare_sensor2)
     (applicable_test sensor_comparison_test sensor1)
     (applicable_test sensor_comparison_test sensor2)
-    (applicable_test sensor_comparison_test sensor3)
-    (applicable_test sensor_comparison_test sensor4)
     (applicable_test sensor_comparison_test spare_sensor1)
-    (applicable_test sensor_comparison_test spare_sensor2)
 
     
     (test_requires_symptom open_valve_test pressure_stable)
@@ -100,11 +87,24 @@
     (recovery_clears_symptom replace_fix pressure_stable)
     (recovery_sets_symptom replace_fix pressure_changing)
 
-    ;; ---------------- observed symptoms ----------------
-    (shows sensor1 pressure_stable)
-    (shows sensor2 pressure_changing)
-    (shows sensor3 erratic_reading)
-    (shows sensor4 pressure_changing)
+    ; ----------------- initial state of the system ----------------
+    (= (valve_opening valve1) 0.5)
+    (= (pressure_threshold) 5.0)
+    (= (time) 0.0)
+    (= (flow_coefficient) 1.2)
+    (= (R_ammonia) 8.314)
+    
+    (= (pressure tank1) 100.0)
+    (= (volume tank1) 50.0)
+    (= (mass tank1) 20.0)
+    (= (temperature tank1) 293.0)
+
+    (is_broken sensor1)
+
+    (= (pressure tank2) 50.0)
+    (= (volume tank2) 50.0)
+    (= (mass tank2) 20.0)
+    (= (temperature tank2) 293.0)
 
 )
 

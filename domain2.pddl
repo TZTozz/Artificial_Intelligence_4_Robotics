@@ -1,7 +1,8 @@
 (
-    define (domain Orbital_domain)
+    define (domain Orbital_domain_plus)
 
-    (:requirements :strips :typing :negative-preconditions :quantified-preconditions :equality :disjunctive-preconditions :conditional-effects)
+    (:requirements :strips :typing :negative-preconditions :quantified-preconditions :equality :disjunctive-preconditions :conditional-effects :fluents :time
+    )
 
     (:types
         location size - object
@@ -10,6 +11,10 @@
         valve tank sensor - component
         tool - item
         fault symptom diagnostic_test recovery_action - object
+    )
+
+    (:constants
+        pressure_changing pressure_stable erratic_reading - symptom
     )
 
     (:predicates
@@ -23,7 +28,7 @@
         (is_open ?v - valve)
         (has_size ?obj - object ?sz - size)
         (needs_isolation ?t - tank)
-        (warehause_location ?l - location)
+        (warehouse_location ?l - location)
 
         ;; ---------------- manipulation ----------------
         (hand_empty)
@@ -49,6 +54,7 @@
         (recovery_requires_spare ?r - recovery_action)
         (recovery_clears_symptom ?r - recovery_action ?sy - symptom)
         (recovery_sets_symptom ?r - recovery_action ?sy - symptom)
+        (checked ?s - sensor)
 
         ;; ---------------- dynamic diagnostic state ----------------
         (shows ?c - component ?sy - symptom)
@@ -58,8 +64,158 @@
         (recovery_done ?r - recovery_action ?c - component)
         (component_ok ?c - component)
 
+        ;---------------- collecting data ----------------
+
+        (has_baseline ?s - sensor)
+
+        ;; ---------------- real world state ----------------
+        (is_broken ?s - sensor)
+        (is_truly_open ?v - valve)
+
+
         (everything_ok)
     )
+
+    (:functions
+        (recorded_pressure ?s - sensor)
+        (reading_pressure ?s - sensor)
+        (pressure ?t - tank)
+        (time_recorded ?s - sensor)
+        (time)
+        (pressure_threshold)
+        (flow_coefficient)
+        (R_ammonia)
+        (valve_opening ?v - valve)
+        (volume ?t - tank)
+        (mass ?t - tank)
+        (temperature ?t - tank)
+    )
+
+    ;---------------------------- Collecting data -------------------------
+    (:action take_baseline_reading
+        :parameters (?s - sensor ?t - tank)
+        :precondition (and 
+            (monitor ?s ?t)
+            (not (has_baseline ?s))
+        )
+        :effect (and 
+            (has_baseline ?s)
+            (assign (recorded_pressure ?s) (reading_pressure ?s))
+            (assign (time_recorded ?s) (time))
+        )
+    )
+
+    (:action evaluate_pressure_changing
+        :parameters (?s - sensor ?t - tank)
+        :precondition (and 
+            (monitor ?s ?t)
+            (has_baseline ?s)
+            (>= (- (time) (time_recorded ?s)) 10.0)
+            (or 
+                (> (- (reading_pressure ?s) (recorded_pressure ?s)) (pressure_threshold))
+                (< (- (reading_pressure ?s) (recorded_pressure ?s)) (- 0 (pressure_threshold)))
+            )
+        )
+        :effect (and 
+            (shows ?s pressure_changing)
+            (checked ?s)
+            (not (has_baseline ?s)) 
+        )
+    )
+
+    (:action evaluate_pressure_stable
+        :parameters (?s - sensor ?t - tank)
+        :precondition (and 
+            (monitor ?s ?t)
+            (has_baseline ?s)
+            (and 
+                (<= (- (reading_pressure ?s) (recorded_pressure ?s)) (pressure_threshold))
+                (>= (- (reading_pressure ?s) (recorded_pressure ?s)) (- 0 (pressure_threshold)))
+            )
+        )
+        :effect (and 
+            (shows ?s pressure_stable)
+            (checked ?s)
+            (not (has_baseline ?s))
+        )
+    )
+
+    (:process sensor_follow_pressure
+        :parameters (?s - sensor ?t - tank)
+        :precondition (and
+            (monitor ?s ?t)
+            (not (is_broken ?s))
+        )
+        :effect (and
+            (assign (reading_pressure ?s) (pressure ?t))
+        )
+    )
+    
+
+
+    (:process tank_to_tank_flow
+        :parameters (?t_src - tank ?t_dest - tank ?v - valve)
+        :precondition (and 
+            (or (valve_connect ?v ?t_src ?t_dest)
+                (valve_connect ?v ?t_dest ?t_src))
+            
+            (> (valve_opening ?v) 0)             
+            (> (pressure ?t_src) (pressure ?t_dest))
+            
+            (> (volume ?t_src) 0)
+            (> (mass ?t_src) 0)
+        )
+        :effect (and 
+            
+            ;--------- Mass changes ----------------
+            ; Flow rate = k * (P_src - P_dest) * opening
+            
+            (decrease (mass ?t_src)
+                (* #t 
+                (* (flow_coefficient) 
+                    (* (- (pressure ?t_src) (pressure ?t_dest)) 
+                        (valve_opening ?v)))
+                )
+            )
+            
+            (increase (mass ?t_dest)
+                (* #t 
+                (* (flow_coefficient) 
+                    (* (- (pressure ?t_src) (pressure ?t_dest)) 
+                        (valve_opening ?v)))
+                )
+            )
+
+            ;--------- Pressure changes ----------------
+            ; Rate of pressure change = (R * T / V) * flow_rate
+            
+            (decrease (pressure ?t_src)
+                (* #t 
+                (* (/ (* (R_ammonia) (temperature ?t_src)) (volume ?t_src))
+                    (* (flow_coefficient) 
+                        (* (- (pressure ?t_src) (pressure ?t_dest)) 
+                            (valve_opening ?v))))
+                )
+            )
+            
+            (increase (pressure ?t_dest)
+                (* #t 
+                (* (/ (* (R_ammonia) (temperature ?t_dest)) (volume ?t_dest))
+                    (* (flow_coefficient) 
+                        (* (- (pressure ?t_src) (pressure ?t_dest)) 
+                            (valve_opening ?v))))
+                )
+            )
+        )
+    )
+
+
+    (:process advance_time
+        :parameters ()
+        :precondition (>= (time) 0.0)
+        :effect (increase (time) (* #t 1.0))
+    )
+    
 
 
     ; --------------------------- Diagnostic reasoning -------------------------
@@ -200,6 +356,7 @@
         :parameters (?s - sensor ?v - valve ?t1 ?t2 - tank ?test - diagnostic_test ?sy - symptom)
         :precondition (and
             (applicable_test ?test ?s)
+            (checked ?s)
             (not (test_done ?test ?s))
             (valve_connect ?v ?t1 ?t2)
             (monitor ?s ?t1)
