@@ -78,7 +78,6 @@
 
     (:functions
         (recorded_pressure ?s - sensor)
-        (reading_pressure ?s - sensor)
         (pressure ?t - tank)
         (time_recorded ?s - sensor)
         (time)
@@ -100,54 +99,42 @@
         )
         :effect (and 
             (has_baseline ?s)
-            (assign (recorded_pressure ?s) (reading_pressure ?s))
             (assign (time_recorded ?s) (time))
+            (when (not (is_broken ?s))
+                (assign (recorded_pressure ?s) (pressure ?t))
+            )
+            (when (is_broken ?s)
+                (assign (recorded_pressure ?s) 0.0)
+            )
         )
     )
+
 
     (:action evaluate_pressure_changing
         :parameters (?s - sensor ?t - tank)
         :precondition (and 
             (monitor ?s ?t)
             (has_baseline ?s)
-            (>= (- (time) (time_recorded ?s)) 10.0)
-            (or 
-                (> (- (reading_pressure ?s) (recorded_pressure ?s)) (pressure_threshold))
-                (< (- (reading_pressure ?s) (recorded_pressure ?s)) (- 0 (pressure_threshold)))
-            )
+            (>= (- (time) (time_recorded ?s)) 3.0)
         )
         :effect (and 
-            (shows ?s pressure_changing)
+            ; Sensor working and changing
+            (when (and (not (is_broken ?s))
+                       (or (> (- (pressure ?t) (recorded_pressure ?s)) (pressure_threshold))
+                           (< (- (pressure ?t) (recorded_pressure ?s)) (- 0 (pressure_threshold)))))
+                (shows ?s pressure_changing)
+            )
+            ; Sensor working and stable
+            (when (and (not (is_broken ?s))
+                       (<= (- (pressure ?t) (recorded_pressure ?s)) (pressure_threshold))
+                       (>= (- (pressure ?t) (recorded_pressure ?s)) (- 0 (pressure_threshold))))
+                (shows ?s pressure_stable)
+            )
+            ; Sensor broken
+            (when (is_broken ?s) (shows ?s pressure_stable))
+
             (checked ?s)
             (not (has_baseline ?s)) 
-        )
-    )
-
-    (:action evaluate_pressure_stable
-        :parameters (?s - sensor ?t - tank)
-        :precondition (and 
-            (monitor ?s ?t)
-            (has_baseline ?s)
-            (and 
-                (<= (- (reading_pressure ?s) (recorded_pressure ?s)) (pressure_threshold))
-                (>= (- (reading_pressure ?s) (recorded_pressure ?s)) (- 0 (pressure_threshold)))
-            )
-        )
-        :effect (and 
-            (shows ?s pressure_stable)
-            (checked ?s)
-            (not (has_baseline ?s))
-        )
-    )
-
-    (:process sensor_follow_pressure
-        :parameters (?s - sensor ?t - tank)
-        :precondition (and
-            (monitor ?s ?t)
-            (not (is_broken ?s))
-        )
-        :effect (and
-            (assign (reading_pressure ?s) (pressure ?t))
         )
     )
     
@@ -345,6 +332,9 @@
             (monitor ?s_target ?t1)
             (monitor ?s_other ?t2)
 
+            (checked ?s_target)
+            (checked ?s_other)
+
             (or (not (shows ?s_target ?sy_fault)) (shows ?s_other ?sy_fault))
         )
         :effect (and 
@@ -509,6 +499,7 @@
         )
         :effect (and
             (not (is_open ?v))
+            (assign (valve_opening ?v) 0.0)
         )
     )
 
@@ -536,6 +527,7 @@
         )
         :effect (and
             (is_open ?v)
+            (assign (valve_opening ?v) 1.0)
         )
     )
 
@@ -560,7 +552,7 @@
         :precondition (and
             (has_item ?item)
             (robot-at ?l)
-            (warehause_location ?l)
+            (warehouse_location ?l)
         )
         :effect (and
             (not (has_item ?item))

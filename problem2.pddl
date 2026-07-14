@@ -2,9 +2,9 @@
 
 (:objects
     loc1 loc2 loc3 - location
-    valve1 valve2 - valve
-    tank1 tank2 tank3 tank4 - tank
-    sensor1 sensor2 sensor3 sensor4 spare_sensor1 spare_sensor2 - sensor
+    valve1 - valve
+    tank1 tank2 - tank
+    sensor1 sensor2 spare_sensor1 - sensor
     adjustable_wrench - tool
     small medium large - size
 
@@ -31,7 +31,6 @@
     (monitor sensor1 tank1) (monitor sensor2 tank2)
 
     (is_open valve1)
-    ;(is_open valve2)
     
 
     (can_torque adjustable_wrench)
@@ -45,7 +44,6 @@
     (applicable_test sensor_self_test sensor1)
     (applicable_test sensor_self_test sensor2)
     (applicable_test sensor_self_test spare_sensor1)
-    (applicable_test sensor_self_test spare_sensor2)
     (applicable_test sensor_comparison_test sensor1)
     (applicable_test sensor_comparison_test sensor2)
     (applicable_test sensor_comparison_test spare_sensor1)
@@ -88,10 +86,10 @@
     (recovery_sets_symptom replace_fix pressure_changing)
 
     ; ----------------- initial state of the system ----------------
-    (= (valve_opening valve1) 0.5)
-    (= (pressure_threshold) 5.0)
+    (= (valve_opening valve1) 0.2)
+    (= (pressure_threshold) 3.0)
     (= (time) 0.0)
-    (= (flow_coefficient) 1.2)
+    (= (flow_coefficient) 0.02)
     (= (R_ammonia) 8.314)
     
     (= (pressure tank1) 100.0)
