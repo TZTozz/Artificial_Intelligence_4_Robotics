@@ -16,6 +16,7 @@
 
 (:init
     (robot-at loc1)
+    (= (speed) 2.0)
     (component_at valve1 loc2)
     (tank_at tank1 loc2) (tank_at tank2 loc3)
     (warehouse_location loc3)
@@ -25,6 +26,8 @@
 
     (is_connected loc1 loc2) (is_connected loc2 loc1)
     (is_connected loc2 loc3) (is_connected loc3 loc2)
+    (= (distance loc1 loc2) 10.0) (= (distance loc2 loc1) 10.0)
+    (= (distance loc2 loc3) 10.0) (= (distance loc3 loc2) 10.0)
 
     (valve_connect valve1 tank1 tank2) (valve_connect valve1 tank2 tank1)
 
@@ -86,7 +89,7 @@
     (recovery_sets_symptom replace_fix pressure_changing)
 
     ; ----------------- initial state of the system ----------------
-    (= (valve_opening valve1) 0.0)
+    (= (valve_opening valve1) 0.8)
     (= (pressure_threshold) 3.0)
     (= (time) 0.0)
     (= (flow_coefficient) 0.002)
@@ -97,7 +100,7 @@
     (= (mass tank1) 20.0)
     (= (temperature tank1) 293.0)
 
-    (shows sensor1 pressure_stable)
+    (shows sensor1 pressure_changing)
     (shows sensor2 pressure_stable)
 
     (= (pressure tank2) 50.0)

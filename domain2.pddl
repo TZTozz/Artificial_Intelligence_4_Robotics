@@ -1,7 +1,9 @@
 (
     define (domain Orbital_domain_plus)
 
-    (:requirements :strips :typing :negative-preconditions :quantified-preconditions :equality :disjunctive-preconditions :conditional-effects :fluents :time
+    (:requirements 
+        :strips :typing :negative-preconditions :quantified-preconditions :equality 
+        :disjunctive-preconditions :conditional-effects :fluents :time :durative-actions
     )
 
     (:types
@@ -68,6 +70,11 @@
 
         (has_baseline ?s - sensor)
 
+        ;------------------ robot movement ----------------
+        (moving)
+        (moving-to ?l - location)
+        (connected ?l1 ?l2 - location)
+
         ;; ---------------- real world state ----------------
         (is_dead_sensor ?s - sensor)
         (is_crazy_sensor ?s - sensor)
@@ -88,6 +95,11 @@
         (volume ?t - tank)
         (mass ?t - tank)
         (temperature ?t - tank)
+
+        (time-elapsed)
+        (duration-move)
+        (distance ?l1 ?l2 - location)
+        (speed)
     )
 
     ;---------------------------- Collecting data -------------------------   
@@ -444,18 +456,56 @@
     )
 
 
-    ; ------------------ Robot actions ------------------
-    (:action move
-        :parameters (?l1 ?l2 - location)
-        :precondition (and
-            (robot-at ?l1)
-            (is_connected ?l1 ?l2)
-        )
-        :effect (and
-            (not (robot-at ?l1))
-            (robot-at ?l2)
-        )
+    ; ================ Robot actions =====================
+    ; (:durative-action move
+    ;     :parameters (?l1 ?l2 - location)
+    ;     :duration (and (= ?duration 5.0))
+    ;     :condition (and
+    ;         (at start (robot-at ?l1))
+    ;         (over all (is_connected ?l1 ?l2))
+    ;     )
+    ;     :effect (and
+    ;         (at start (not (robot-at ?l1)))
+    ;         (at end (robot-at ?l2))
+    ;     )
+    ; )
+
+    (:action start-move
+    :parameters (?from ?to - location)
+    :precondition (and
+        (robot-at ?from)
+        (not (moving))
+        (is_connected ?from ?to)
     )
+    :effect (and
+        (not (robot-at ?from))
+        (moving)
+        (moving-to ?to)
+        (assign (time-elapsed) 0)
+        (assign (duration-move) (/ (distance ?from ?to) (speed)))
+    )
+    )
+
+    (:process during-move
+    :parameters ()
+    :precondition (moving)
+    :effect (increase (time-elapsed) (* #t 1))
+    )
+
+    (:event end-move
+    :parameters (?to - location)
+    :precondition (and
+        (moving-to ?to)
+        (>= (time-elapsed) (duration-move))
+    )
+    :effect (and
+        (not (moving))
+        (not (moving-to ?to))
+        (robot-at ?to)
+    )
+    )
+
+    ;------------------ Valve actions ------------------
 
     (:action close_valve
         :parameters (?v - valve ?l - location ?t1 ?t2 - tank)
