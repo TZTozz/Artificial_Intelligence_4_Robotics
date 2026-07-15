@@ -90,60 +90,7 @@
         (temperature ?t - tank)
     )
 
-    ;---------------------------- Collecting data -------------------------
-    (:action take_baseline_reading
-        :parameters (?s - sensor ?t - tank)
-        :precondition (and 
-            (monitor ?s ?t)
-            (not (has_baseline ?s))
-        )
-        :effect (and 
-            (has_baseline ?s)
-            (assign (time_recorded ?s) (time))
-            (when (not (is_dead_sensor ?s))
-                (assign (recorded_pressure ?s) (pressure ?t))
-            )
-            (when (or (is_dead_sensor ?s) (is_crazy_sensor ?s))
-                (assign (recorded_pressure ?s) 0.0)
-            )
-        )
-    )
-
-
-    (:action evaluate_pressure_changing
-        :parameters (?s - sensor ?t - tank)
-        :precondition (and 
-            (monitor ?s ?t)
-            (has_baseline ?s)
-            (>= (- (time) (time_recorded ?s)) 3.0)
-        )
-        :effect (and 
-            (not (shows ?s pressure_stable))
-            (not (shows ?s pressure_changing))
-            (not (shows ?s erratic_reading))
-            
-            ; Sensor working and changing
-            (when (and (not (is_dead_sensor ?s)) (not (is_crazy_sensor ?s))
-                       (or (> (- (pressure ?t) (recorded_pressure ?s)) (pressure_threshold))
-                           (< (- (pressure ?t) (recorded_pressure ?s)) (- 0 (pressure_threshold)))))
-                (shows ?s pressure_changing)
-                
-            )
-            ; Sensor working and stable
-            (when (and (not (is_dead_sensor ?s)) (not (is_crazy_sensor ?s))
-                       (<= (- (pressure ?t) (recorded_pressure ?s)) (pressure_threshold))
-                       (>= (- (pressure ?t) (recorded_pressure ?s)) (- 0 (pressure_threshold))))
-                (shows ?s pressure_stable)
-            )
-            ; Sensor broken
-            (when (is_dead_sensor ?s) (shows ?s pressure_stable))
-            (when (is_crazy_sensor ?s) (shows ?s erratic_reading))
-
-            (checked ?s)
-            (not (has_baseline ?s)) 
-        )
-    )
-    
+    ;---------------------------- Collecting data -------------------------   
 
 
     (:process tank_to_tank_flow
@@ -203,21 +150,21 @@
     )
 
 
-    (:process advance_time
-        :parameters ()
-        :precondition (and 
-            (>= (time) 0.0)
-            (exists (?s - sensor) (has_baseline ?s))
-        )
-        :effect (increase (time) (* #t 1.0))
-    )
+    ; (:process advance_time
+    ;     :parameters ()
+    ;     :precondition (and 
+    ;         (>= (time) 0.0)
+    ;     )
+    ;     :effect (increase (time) (* #t 1.0))
+    ; )
 
     (:event pressure_equilized
         :parameters (?t1 ?t2 - tank ?v - valve)
         :precondition (and
             (valve_connect ?v ?t1 ?t2)
-            (<= (- (pressure ?t1) (pressure ?t2)) 0.01)
-            (>= (- (pressure ?t1) (pressure ?t2)) -0.01)
+            (<= (- (pressure ?t1) (pressure ?t2)) 1.0)
+            (>= (- (pressure ?t1) (pressure ?t2)) -1.0)
+            (not (killed))
         )
         :effect (and
             (killed)
@@ -335,9 +282,6 @@
 
             (not (shows ?s1 ?sy_fault))
             (not (shows ?s2 ?sy_fault))
-
-            (checked ?s1)
-            (checked ?s2)
         )
         :effect (and 
             (test_done ?test ?v)
@@ -357,9 +301,6 @@
             (monitor ?s_target ?t1)
             (monitor ?s_other ?t2)
 
-            (checked ?s_target)
-            (checked ?s_other)
-
             (or (not (shows ?s_target ?sy_fault)) (shows ?s_other ?sy_fault))
         )
         :effect (and 
@@ -371,7 +312,6 @@
         :parameters (?s - sensor ?v - valve ?t1 ?t2 - tank ?test - diagnostic_test ?sy - symptom)
         :precondition (and
             (applicable_test ?test ?s)
-            (checked ?s)
             (not (test_done ?test ?s))
             (valve_connect ?v ?t1 ?t2)
             (monitor ?s ?t1)

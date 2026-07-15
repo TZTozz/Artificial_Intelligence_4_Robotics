@@ -30,7 +30,7 @@
 
     (monitor sensor1 tank1) (monitor sensor2 tank2)
 
-    ;(is_open valve1)
+    (is_open valve1)
     
 
     (can_torque adjustable_wrench)
@@ -40,7 +40,7 @@
     (hand_empty)
 
     ;; ---------------- diagnostic knowledge base ----------------
-    (applicable_test closed_valve_test valve1)
+    (applicable_test open_valve_test valve1)
     (applicable_test sensor_self_test sensor1)
     (applicable_test sensor_self_test sensor2)
     (applicable_test sensor_self_test spare_sensor1)
@@ -86,7 +86,7 @@
     (recovery_sets_symptom replace_fix pressure_changing)
 
     ; ----------------- initial state of the system ----------------
-    (= (valve_opening valve1) 0.2)
+    (= (valve_opening valve1) 0.9)
     (= (pressure_threshold) 3.0)
     (= (time) 0.0)
     (= (flow_coefficient) 0.002)
@@ -98,7 +98,9 @@
     (= (temperature tank1) 293.0)
 
     ;(is_dead_sensor sensor1)
-    (is_crazy_sensor sensor1)
+    ;(is_crazy_sensor sensor1)
+    (shows sensor1 pressure_stable)
+    (shows sensor2 pressure_stable)
 
     (= (pressure tank2) 50.0)
     (= (volume tank2) 50.0)
