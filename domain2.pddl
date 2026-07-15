@@ -383,6 +383,12 @@
             (shows ?s1 ?sy_new)
             (not (shows ?s2 ?sy_old))
             (shows ?s2 ?sy_new)
+            (when (recovery_requires_closed ?r)
+                (and 
+                    (assign (valve_opening ?v) 0.0)
+                    (not (is_open ?v))
+                )
+            )
             (forall (?t - diagnostic_test) (and (not (test_done ?t ?v))))
         )
     )

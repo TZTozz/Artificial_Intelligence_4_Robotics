@@ -86,7 +86,7 @@
     (recovery_sets_symptom replace_fix pressure_changing)
 
     ; ----------------- initial state of the system ----------------
-    (= (valve_opening valve1) 0.9)
+    (= (valve_opening valve1) 0.0)
     (= (pressure_threshold) 3.0)
     (= (time) 0.0)
     (= (flow_coefficient) 0.002)
@@ -97,8 +97,6 @@
     (= (mass tank1) 20.0)
     (= (temperature tank1) 293.0)
 
-    ;(is_dead_sensor sensor1)
-    ;(is_crazy_sensor sensor1)
     (shows sensor1 pressure_stable)
     (shows sensor2 pressure_stable)
 
