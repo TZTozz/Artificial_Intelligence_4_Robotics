@@ -69,10 +69,10 @@
         (has_baseline ?s - sensor)
 
         ;; ---------------- real world state ----------------
-        (is_broken ?s - sensor)
-        (is_truly_open ?v - valve)
+        (is_dead_sensor ?s - sensor)
+        (is_crazy_sensor ?s - sensor)
 
-
+        (killed)
         (everything_ok)
     )
 
@@ -100,10 +100,10 @@
         :effect (and 
             (has_baseline ?s)
             (assign (time_recorded ?s) (time))
-            (when (not (is_broken ?s))
+            (when (not (is_dead_sensor ?s))
                 (assign (recorded_pressure ?s) (pressure ?t))
             )
-            (when (is_broken ?s)
+            (when (or (is_dead_sensor ?s) (is_crazy_sensor ?s))
                 (assign (recorded_pressure ?s) 0.0)
             )
         )
@@ -118,20 +118,26 @@
             (>= (- (time) (time_recorded ?s)) 3.0)
         )
         :effect (and 
+            (not (shows ?s pressure_stable))
+            (not (shows ?s pressure_changing))
+            (not (shows ?s erratic_reading))
+            
             ; Sensor working and changing
-            (when (and (not (is_broken ?s))
+            (when (and (not (is_dead_sensor ?s)) (not (is_crazy_sensor ?s))
                        (or (> (- (pressure ?t) (recorded_pressure ?s)) (pressure_threshold))
                            (< (- (pressure ?t) (recorded_pressure ?s)) (- 0 (pressure_threshold)))))
                 (shows ?s pressure_changing)
+                
             )
             ; Sensor working and stable
-            (when (and (not (is_broken ?s))
+            (when (and (not (is_dead_sensor ?s)) (not (is_crazy_sensor ?s))
                        (<= (- (pressure ?t) (recorded_pressure ?s)) (pressure_threshold))
                        (>= (- (pressure ?t) (recorded_pressure ?s)) (- 0 (pressure_threshold))))
                 (shows ?s pressure_stable)
             )
             ; Sensor broken
-            (when (is_broken ?s) (shows ?s pressure_stable))
+            (when (is_dead_sensor ?s) (shows ?s pressure_stable))
+            (when (is_crazy_sensor ?s) (shows ?s erratic_reading))
 
             (checked ?s)
             (not (has_baseline ?s)) 
@@ -199,9 +205,25 @@
 
     (:process advance_time
         :parameters ()
-        :precondition (>= (time) 0.0)
+        :precondition (and 
+            (>= (time) 0.0)
+            (exists (?s - sensor) (has_baseline ?s))
+        )
         :effect (increase (time) (* #t 1.0))
     )
+
+    (:event pressure_equilized
+        :parameters (?t1 ?t2 - tank ?v - valve)
+        :precondition (and
+            (valve_connect ?v ?t1 ?t2)
+            (<= (- (pressure ?t1) (pressure ?t2)) 0.01)
+            (>= (- (pressure ?t1) (pressure ?t2)) -0.01)
+        )
+        :effect (and
+            (killed)
+        )
+    )
+    
     
 
 
@@ -313,6 +335,9 @@
 
             (not (shows ?s1 ?sy_fault))
             (not (shows ?s2 ?sy_fault))
+
+            (checked ?s1)
+            (checked ?s2)
         )
         :effect (and 
             (test_done ?test ?v)

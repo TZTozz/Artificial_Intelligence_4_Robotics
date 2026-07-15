@@ -30,7 +30,7 @@
 
     (monitor sensor1 tank1) (monitor sensor2 tank2)
 
-    (is_open valve1)
+    ;(is_open valve1)
     
 
     (can_torque adjustable_wrench)
@@ -40,7 +40,7 @@
     (hand_empty)
 
     ;; ---------------- diagnostic knowledge base ----------------
-    (applicable_test open_valve_test valve1)
+    (applicable_test closed_valve_test valve1)
     (applicable_test sensor_self_test sensor1)
     (applicable_test sensor_self_test sensor2)
     (applicable_test sensor_self_test spare_sensor1)
@@ -89,7 +89,7 @@
     (= (valve_opening valve1) 0.2)
     (= (pressure_threshold) 3.0)
     (= (time) 0.0)
-    (= (flow_coefficient) 0.02)
+    (= (flow_coefficient) 0.002)
     (= (R_ammonia) 8.314)
     
     (= (pressure tank1) 100.0)
@@ -97,7 +97,8 @@
     (= (mass tank1) 20.0)
     (= (temperature tank1) 293.0)
 
-    (is_broken sensor1)
+    ;(is_dead_sensor sensor1)
+    (is_crazy_sensor sensor1)
 
     (= (pressure tank2) 50.0)
     (= (volume tank2) 50.0)
@@ -109,6 +110,7 @@
 (:goal (and
     (everything_ok)
     (hand_empty)
+    (not (killed))
     (forall (?i - item) (or (not (in_toolbox ?i))
                             (= ?i adjustable_wrench)
     ))
