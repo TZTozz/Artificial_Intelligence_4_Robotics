@@ -5,20 +5,21 @@
     valve1 - valve
     tank1 tank2 - tank
     sensor1 sensor2 spare_sensor1 - sensor
-    adjustable_wrench - tool
+    adjustable_wrench lubricant - tool
     small medium large - size
+    panel1 - panel
 
     ;; --- diagnostic knowledge base objects ---
-    valve_stuck_fault valve_leak_fault sensor_crazy_fault sensor_dead_fault - fault
-    open_valve_test closed_valve_test sensor_self_test sensor_comparison_test - diagnostic_test
+    valve_stuck_fault valve_leak_fault sensor_crazy_fault sensor_dead_fault panel_jammed - fault
+    open_valve_test closed_valve_test sensor_self_test sensor_comparison_test panel_movement_test - diagnostic_test
     unstuck_fix tighten_fix replace_fix - recovery_action
 )
 
 (:init
     (robot-at loc1)
     (= (speed) 2.0)
-    (component_at valve1 loc2)
-    (tank_at tank1 loc2) (tank_at tank2 loc3)
+    (fixed_at valve1 loc2)
+    (fixed_at tank1 loc2) (fixed_at tank2 loc3)
     (warehouse_location loc3)
     (item_at spare_sensor1 loc3)
     (is_spare spare_sensor1)
@@ -50,6 +51,7 @@
     (applicable_test sensor_comparison_test sensor1)
     (applicable_test sensor_comparison_test sensor2)
     (applicable_test sensor_comparison_test spare_sensor1)
+    (applicable_test panel_movement_test panel1)
 
     
     (test_requires_symptom open_valve_test pressure_stable)
@@ -90,8 +92,6 @@
 
     ; ----------------- initial state of the system ----------------
     (= (valve_opening valve1) 1)
-    (= (pressure_threshold) 3.0)
-    (= (time) 0.0)
     (= (flow_coefficient) 0.002)
     (= (R_ammonia) 8.314)
     

@@ -10,20 +10,19 @@
         location size - object
         item - object
         component - item
-        valve tank sensor - component
+        valve tank sensor panel - component
         tool - item
         fault symptom diagnostic_test recovery_action - object
     )
 
     (:constants
-        pressure_changing pressure_stable erratic_reading - symptom
+        pressure_changing pressure_stable erratic_reading high_current no_movement - symptom
     )
 
     (:predicates
         ;; ---------------- spatial / structural ----------------
         (robot-at ?l - location)
-        (component_at ?c - component ?l - location)
-        (tank_at ?t - tank ?l - location)
+        (fixed_at ?item - item ?loc - location)
         (is_connected ?l1 - location ?l2 - location)
         (valve_connect ?v - valve ?t1 - tank ?t2 - tank)
         (monitor ?s - sensor ?t - tank)
@@ -39,6 +38,7 @@
         (in_toolbox ?i - item)
         (is_adjustable ?tool - tool)
         (can_torque ?tool - tool)
+        (can_lub ?tool - tool)
         (is_spare ?c - component)
 
         ;; ---------------- diagnostic knowledge base ----------------
@@ -56,9 +56,9 @@
         (recovery_requires_spare ?r - recovery_action)
         (recovery_clears_symptom ?r - recovery_action ?sy - symptom)
         (recovery_sets_symptom ?r - recovery_action ?sy - symptom)
-        (checked ?s - sensor)
 
         ;; ---------------- dynamic diagnostic state ----------------
+        ; --------- valve --------
         (shows ?c - component ?sy - symptom)
         (test_done ?t - diagnostic_test ?c - component)
         (possible_fault ?c - component ?f - fault)
@@ -66,29 +66,27 @@
         (recovery_done ?r - recovery_action ?c - component)
         (component_ok ?c - component)
 
-        ;---------------- collecting data ----------------
-
-        (has_baseline ?s - sensor)
+        ;--------- panel -------
+        (panel_jammed ?p - panel)
+        (panel_free ?p - panel)
+        (moving_panel ?p - panel)
+        (recovering_jam ?p - panel)
+        (is_lubricated ?p - panel)
 
         ;------------------ robot movement ----------------
         (moving)
         (moving-to ?l - location)
-        (connected ?l1 ?l2 - location)
 
         ;; ---------------- real world state ----------------
-        (is_dead_sensor ?s - sensor)
-        (is_crazy_sensor ?s - sensor)
+
 
         (killed)
         (everything_ok)
     )
 
     (:functions
-        (recorded_pressure ?s - sensor)
+        ;------ valve ------
         (pressure ?t - tank)
-        (time_recorded ?s - sensor)
-        (time)
-        (pressure_threshold)
         (flow_coefficient)
         (R_ammonia)
         (valve_opening ?v - valve)
@@ -100,6 +98,14 @@
         (duration-move)
         (distance ?l1 ?l2 - location)
         (speed)
+
+        ; ------ panel -----
+        (panel_position ?p - panel)
+        (manipulator_current ?p - panel)
+        (jam_severity ?p - panel)
+        (beta_free ?p - panel)
+        (manipulator_current_limit)
+        (movement_speed)
     )
 
     ;======================== Physical modellation =========================
@@ -161,15 +167,6 @@
         )
     )
 
-
-    ; (:process advance_time
-    ;     :parameters ()
-    ;     :precondition (and 
-    ;         (>= (time) 0.0)
-    ;     )
-    ;     :effect (increase (time) (* #t 1.0))
-    ; )
-
     (:event pressure_equilized
         :parameters (?t1 ?t2 - tank ?v - valve)
         :precondition (and
@@ -182,7 +179,62 @@
             (killed)
         )
     )
+
+    ;------------- panel process ----------
+    (:process panel_normal_movement
+        :parameters (?p - panel)
+        :precondition (and 
+            (moving_panel ?p) 
+            (panel_free ?p) 
+            (not (panel_jammed ?p))
+        )
+        :effect (and
+            (increase (panel_position ?p) (* #t (movement_speed)))
+        )
+    )
+
+    (:process motor_stall
+        :parameters (?p - panel)
+        :precondition (and 
+            (moving_panel ?p) 
+            (panel_jammed ?p)
+        )
+        :effect (and 
+            (increase (manipulator_current ?p) (* #t 5.0)) 
+        )
+    )
+
+    (:process free_panel_recovery
+        :parameters (?p - panel)
+        :precondition (recovering_jam ?p)
+        :effect (decrease (jam_severity ?p) (* #t (beta_free ?p)))
+    )
     
+    (:event alarm_panel_jammed
+        :parameters (?p - panel)
+        :precondition (and 
+            (moving_panel ?p)
+            (> (manipulator_current ?p) (manipulator_current_limit))
+        )
+        :effect (and 
+            (shows ?p high_current)
+            (shows ?p no_movement)
+        )
+    )
+
+    (:event jam_cleared
+        :parameters (?p - panel)
+        :precondition (and 
+            (recovering_jam ?p) 
+            (<= (jam_severity ?p) 0.0)
+        )
+        :effect (and 
+            (not (recovering_jam ?p))
+            (not (panel_jammed ?p))
+            (panel_free ?p)
+            (assign (manipulator_current ?p) 0.0)
+        )
+    )
     
 
 
@@ -273,6 +325,23 @@
         :effect (and
             (possible_fault ?s ?f)
             (test_done ?test ?s)
+        )
+    )
+
+
+    (:action run_diagnostic_panel_jam
+        :parameters (?p - panel ?test - diagnostic_test ?f - fault)
+        :precondition (and 
+            (applicable_test ?test ?p)
+            (not (test_done ?test ?p))
+            (test_indicates ?test ?f)
+            (shows ?p high_current)
+            (shows ?p no_movement)
+        )
+        :effect (and 
+            (possible_fault ?p ?f)
+            (test_done ?test ?p)
+            (not (moving_panel ?p))
         )
     )
 
@@ -374,7 +443,7 @@
             (confirmed_fault ?v ?f)
             (fixed_by ?r ?f)
             (recovery_requires_torque ?r)
-            (component_at ?v ?l)
+            (fixed_at ?v ?l)
             (robot-at ?l)
             (has_item ?tool)
             (can_torque ?tool)
@@ -412,7 +481,7 @@
             (fixed_by ?r ?f)
             (recovery_requires_spare ?r)
             (robot-at ?l)
-            (tank_at ?t ?l)
+            (fixed_at ?t ?l)
             (monitor ?s_old ?t)
             (has_item ?s_new)
             (is_spare ?s_new)
@@ -436,6 +505,22 @@
                 (and (not (test_done ?t2 ?s_old))))
             (not (shows ?s_old ?sy_old))
             (shows ?s_new ?sy_new)
+        )
+    )
+
+    (:action apply_lubrication_recovery
+        :parameters (?p - panel ?l - location ?lub - item)
+        :precondition (and 
+            (robot-at ?l)
+            (fixed_at ?p ?l)
+            (has_item ?lub)
+            (can_lub ?lub)
+            (not (is_lubricated ?p))
+        )
+        :effect (and 
+            (is_lubricated ?p)
+            (increase (beta_free ?p) 2.5)
+            (not (has_item ?lub))
         )
     )
 
@@ -499,7 +584,7 @@
         :parameters (?v - valve ?l - location ?t1 ?t2 - tank)
         :precondition (and
             (robot-at ?l)
-            (component_at ?v ?l)
+            (fixed_at ?v ?l)
             (is_open ?v)
             (hand_empty)
             (not (exists (?f - fault) (and (confirmed_fault ?v ?f) (fault_prevents_movement ?f))))
@@ -516,7 +601,7 @@
         :parameters (?v - valve ?l - location ?t1 ?t2 - tank)
         :precondition (and
             (robot-at ?l)
-            (component_at ?v ?l)
+            (fixed_at ?v ?l)
             (valve_connect ?v ?t1 ?t2)
             (not (is_open ?v))
             (hand_empty)
@@ -538,6 +623,12 @@
             (is_open ?v)
             (assign (valve_opening ?v) 1.0)
         )
+    )
+
+    (:action open_panel
+        :parameters (?p - panel)
+        :precondition (not (moving_panel ?p))
+        :effect (moving_panel ?p)
     )
 
 
