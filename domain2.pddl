@@ -102,9 +102,9 @@
         (speed)
     )
 
-    ;---------------------------- Collecting data -------------------------   
-
-
+    ;======================== Physical modellation =========================
+    ;--------- Flow between tanks through a valve ----------   
+    
     (:process tank_to_tank_flow
         :parameters (?t_src - tank ?t_dest - tank ?v - valve)
         :precondition (and 
@@ -186,7 +186,7 @@
     
 
 
-    ; --------------------------- Diagnostic reasoning -------------------------
+    ; ========================= Diagnostic reasoning =========================
     ;-----------start-----------
     (:action run_diagnostic_valve_stuck
         :parameters (?v - valve ?t1 ?t2 - tank ?s1 ?s2 - sensor ?test - diagnostic_test ?f - fault ?sy - symptom)
@@ -366,7 +366,7 @@
     )
 
 
-    ; ------------------ Recovery actions ------------------
+    ; ======================= Recovery actions ==========================
 
     (:action apply_mechanical_recovery
         :parameters (?r - recovery_action ?f - fault ?v - valve ?l - location ?tool - tool ?size_needed - size ?s1 ?s2 - sensor ?t1 ?t2 - tank ?sy_old ?sy_new - symptom)
@@ -457,19 +457,7 @@
 
 
     ; ================ Robot actions =====================
-    ; (:durative-action move
-    ;     :parameters (?l1 ?l2 - location)
-    ;     :duration (and (= ?duration 5.0))
-    ;     :condition (and
-    ;         (at start (robot-at ?l1))
-    ;         (over all (is_connected ?l1 ?l2))
-    ;     )
-    ;     :effect (and
-    ;         (at start (not (robot-at ?l1)))
-    ;         (at end (robot-at ?l2))
-    ;     )
-    ; )
-
+    ; ---------- moving ----------
     (:action start-move
     :parameters (?from ?to - location)
     :precondition (and
@@ -553,7 +541,7 @@
     )
 
 
-    ;; -------- Manipulate object actions --------
+    ; -------- Manipulate object actions --------
     (:action pick_up_item
         :parameters (?item - item ?l - location)
         :precondition (and

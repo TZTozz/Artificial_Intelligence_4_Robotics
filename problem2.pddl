@@ -89,7 +89,7 @@
     (recovery_sets_symptom replace_fix pressure_changing)
 
     ; ----------------- initial state of the system ----------------
-    (= (valve_opening valve1) 0.8)
+    (= (valve_opening valve1) 1)
     (= (pressure_threshold) 3.0)
     (= (time) 0.0)
     (= (flow_coefficient) 0.002)
