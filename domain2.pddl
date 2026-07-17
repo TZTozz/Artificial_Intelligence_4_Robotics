@@ -72,8 +72,10 @@
         (moving_panel ?p - panel)
         (recovering_jam ?p - panel)
         (is_lubricated ?p - panel)
-        (open_panel ?p - panel)
         (covers ?p - panel ?t - tank)
+        (panel_open ?p - panel)
+        (opening_panel ?p - panel)
+        (closing_panel ?p - panel)
 
         ;------------------ robot movement ----------------
         (moving)
@@ -103,7 +105,8 @@
 
         ; ------ panel -----
         (panel_position ?p - panel)
-        (manipulator_current ?p - panel)
+        (panel_open_position ?p - panel)
+        (manipulator_current)
         (jam_severity ?p - panel)
         (beta_free ?p - panel)
         (manipulator_current_limit)
@@ -183,15 +186,29 @@
     )
 
     ;------------- panel process ----------
-    (:process panel_normal_movement
+    (:process panel_opening_movement
         :parameters (?p - panel)
         :precondition (and 
             (moving_panel ?p) 
+            (opening_panel ?p)
             (panel_free ?p) 
             (not (panel_jammed ?p))
         )
         :effect (and
             (increase (panel_position ?p) (* #t (movement_speed)))
+        )
+    )
+
+    (:process panel_closing_movement
+        :parameters (?p - panel)
+        :precondition (and 
+            (moving_panel ?p) 
+            (closing_panel ?p)
+            (panel_free ?p) 
+            (not (panel_jammed ?p))
+        )
+        :effect (and
+            (decrease (panel_position ?p) (* #t (movement_speed)))
         )
     )
 
@@ -202,25 +219,54 @@
             (panel_jammed ?p)
         )
         :effect (and 
-            (increase (manipulator_current ?p) (* #t 5.0)) 
+            (increase (manipulator_current) (* #t 5.0)) 
         )
-    )
-
-    (:process free_panel_recovery
-        :parameters (?p - panel)
-        :precondition (recovering_jam ?p)
-        :effect (decrease (jam_severity ?p) (* #t (beta_free ?p)))
     )
     
     (:event alarm_panel_jammed
         :parameters (?p - panel)
         :precondition (and 
             (moving_panel ?p)
-            (> (manipulator_current ?p) (manipulator_current_limit))
+            (> (manipulator_current) (manipulator_current_limit))
         )
         :effect (and 
             (shows ?p high_current)
             (shows ?p no_movement)
+            (not (moving_panel ?p))
+            (not (opening_panel ?p))
+            (not (closing_panel ?p))
+        )
+    )
+
+    (:event panel_finished_opening
+        :parameters (?p - panel)
+        :precondition (and
+            (moving_panel ?p)
+            (opening_panel ?p)
+            (>= (panel_position ?p) (panel_open_position ?p))
+        )
+        :effect (and
+            (not (moving_panel ?p))
+            (not (opening_panel ?p))
+            (panel_open ?p)
+            (assign (panel_position ?p) (panel_open_position ?p))
+            (assign (manipulator_current) 0.0)
+        )
+    )
+
+    (:event panel_finished_closing
+        :parameters (?p - panel)
+        :precondition (and
+            (moving_panel ?p)
+            (closing_panel ?p)
+            (<= (panel_position ?p) 0.0)
+        )
+        :effect (and
+            (not (moving_panel ?p))
+            (not (closing_panel ?p))
+            (not (panel_open ?p))
+            (assign (panel_position ?p) 0.0)
+            (assign (manipulator_current) 0.0)
         )
     )
 
@@ -234,7 +280,7 @@
             (not (recovering_jam ?p))
             (not (panel_jammed ?p))
             (panel_free ?p)
-            (assign (manipulator_current ?p) 0.0)
+            (assign (manipulator_current) 0.0)
         )
     )
     
@@ -477,7 +523,7 @@
     )
 
     (:action apply_replacement_recovery
-        :parameters (?r - recovery_action ?f - fault ?s_old ?s_new - sensor ?t - tank ?l - location ?sy_old ?sy_new - symptom)
+        :parameters (?r - recovery_action ?f - fault ?s_old ?s_new - sensor ?t - tank ?l - location ?p - panel ?sy_old ?sy_new - symptom)
         :precondition (and
             (confirmed_fault ?s_old ?f)
             (fixed_by ?r ?f)
@@ -487,6 +533,8 @@
             (monitor ?s_old ?t)
             (has_item ?s_new)
             (is_spare ?s_new)
+            (covers ?p ?t)
+            (panel_open ?p)
             (forall (?v - valve ?t_other - tank)
                 (or (not (valve_connect ?v ?t ?t_other))
                     (not (is_open_valve ?v))))
@@ -557,6 +605,7 @@
         (robot-at ?from)
         (not (moving))
         (is_connected ?from ?to)
+        (forall (?p - panel) (not (moving_panel ?p)))
     )
     :effect (and
         (not (robot-at ?from))
@@ -635,23 +684,59 @@
 
     ;------------- Panel action ---------------
 
-    (:action start_manipulating_panel
+    ; (:action start_manipulating_panel
+    ;     :parameters (?p - panel ?l - location)
+    ;     :precondition (and 
+    ;         (robot-at ?l)
+    ;         (fixed_at ?p ?l)
+    ;         (not (moving_panel ?p))
+    ;         (hand_empty)
+    ;     )
+    ;     :effect (and
+    ;         (moving_panel ?p)
+    ;         (not (hand_empty))
+    ;     )
+    ; )
+
+    ; (:action stop_manipulating_panel
+    ;     :parameters (?p - panel)
+    ;     :precondition (moving_panel ?p)
+    ;     :effect (and 
+    ;         (not (moving_panel ?p))
+    ;         (not (opening_panel ?p))
+    ;         (not (closing_panel ?p))
+    ;         (assign (manipulator_current) 0.0)
+    ;         (hand_empty)
+    ;     )
+    ; )
+
+    (:action start_open_panel
         :parameters (?p - panel ?l - location)
-        :precondition (and 
+        :precondition (and
             (robot-at ?l)
             (fixed_at ?p ?l)
+            (not (panel_open ?p))
             (not (moving_panel ?p))
             (hand_empty)
         )
-        :effect (moving_panel ?p)
+        :effect (and
+            (moving_panel ?p)
+            (opening_panel ?p)
+        )
     )
 
-    (:action stop_manipulating_panel
-        :parameters (?p - panel)
-        :precondition (moving_panel ?p)
-        :effect (and 
+    (:action start_close_panel
+        :parameters (?p - panel ?l - location)
+        :precondition (and
+            (robot-at ?l)
+            (fixed_at ?p ?l)
+            (panel_open ?p)
             (not (moving_panel ?p))
-            (assign (manipulator_current) 0.0)
+            (hand_empty)
+        )
+        :effect (and
+            (moving_panel ?p)
+            (closing_panel ?p)
         )
     )
 

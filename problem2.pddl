@@ -7,7 +7,7 @@
     sensor1 sensor2 spare_sensor1 - sensor
     adjustable_wrench lubricant - tool
     small medium large - size
-    panel1 - panel
+    panel1 panel2 - panel
 
     ;; --- diagnostic knowledge base objects ---
     valve_stuck_fault valve_leak_fault sensor_crazy_fault sensor_dead_fault panel_jammed - fault
@@ -31,16 +31,19 @@
     (= (distance loc2 loc3) 10.0) (= (distance loc3 loc2) 10.0)
 
     (valve_connect valve1 tank1 tank2) (valve_connect valve1 tank2 tank1)
+    (covers panel1 tank1) (covers panel2 tank2)
+    (fixed_at panel1 loc2) (fixed_at panel2 loc3)
 
     (monitor sensor1 tank1) (monitor sensor2 tank2)
 
-    (is_open valve1)
+    (is_open_valve valve1)
     
 
     (can_torque adjustable_wrench)
     (has_size adjustable_wrench medium)
     (is_adjustable adjustable_wrench)
     (in_toolbox adjustable_wrench)
+    (in_toolbox lubricant)
     (hand_empty)
 
     ;; ---------------- diagnostic knowledge base ----------------
@@ -90,7 +93,7 @@
     (recovery_clears_symptom replace_fix pressure_stable)
     (recovery_sets_symptom replace_fix pressure_changing)
 
-    ; ----------------- initial state of the system ----------------
+    ; ----------------- initial state valve ----------------
     (= (valve_opening valve1) 1)
     (= (flow_coefficient) 0.002)
     (= (R_ammonia) 8.314)
@@ -108,6 +111,23 @@
     (= (mass tank2) 20.0)
     (= (temperature tank2) 293.0)
 
+    ; ------------------ initial state panel ----------------
+    (= (movement_speed) 5.0)
+    (= (manipulator_current) 0.0)
+    (= (manipulator_current_limit) 50.0)
+
+    (= (panel_position panel1) 0.0)
+    (= (panel_open_position panel1) 90.0)
+    (= (jam_severity panel1) 0.0)
+    (= (beta_free panel1) 0.0)
+    (panel_free panel1)
+
+    (= (panel_position panel2) 0.0)
+    (= (panel_open_position panel2) 90.0)
+    (= (jam_severity panel2) 0.0)
+    (= (beta_free panel2) 0.0)
+    (panel_jammed panel2)
+
 )
 
 (:goal (and
@@ -117,6 +137,7 @@
     (forall (?i - item) (or (not (in_toolbox ?i))
                             (= ?i adjustable_wrench)
     ))
+    (forall (?p - panel) (not (panel_open ?p)))
 ))
 
 )
