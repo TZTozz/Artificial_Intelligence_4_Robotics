@@ -1,29 +1,35 @@
 (
-    define (domain Orbital_domain)
+    define (domain Orbital_domain_Q2)
 
-    (:requirements :strips :typing :negative-preconditions :quantified-preconditions :equality :disjunctive-preconditions :conditional-effects)
+    (:requirements 
+        :strips :typing :negative-preconditions :quantified-preconditions :equality 
+        :disjunctive-preconditions :conditional-effects :fluents :time :durative-actions
+    )
 
     (:types
         location size - object
         item - object
         component - item
-        valve tank sensor - component
+        valve tank sensor panel - component
         tool - item
         fault symptom diagnostic_test recovery_action - object
+    )
+
+    (:constants
+        pressure_changing pressure_stable erratic_reading no_movement - symptom
     )
 
     (:predicates
         ;; ---------------- spatial / structural ----------------
         (robot-at ?l - location)
-        (component_at ?c - component ?l - location)
-        (tank_at ?t - tank ?l - location)
+        (fixed_at ?item - item ?loc - location)
         (is_connected ?l1 - location ?l2 - location)
         (valve_connect ?v - valve ?t1 - tank ?t2 - tank)
         (monitor ?s - sensor ?t - tank)
-        (is_open ?v - valve)
+        (is_open_valve ?v - valve)
         (has_size ?obj - object ?sz - size)
         (needs_isolation ?t - tank)
-        (warehause_location ?l - location)
+        (warehouse_location ?l - location)
 
         ;; ---------------- manipulation ----------------
         (hand_empty)
@@ -32,6 +38,7 @@
         (in_toolbox ?i - item)
         (is_adjustable ?tool - tool)
         (can_torque ?tool - tool)
+        (can_lub ?tool - tool)
         (is_spare ?c - component)
 
         ;; ---------------- diagnostic knowledge base ----------------
@@ -47,10 +54,12 @@
         (recovery_requires_closed ?r - recovery_action)
         (recovery_requires_torque ?r - recovery_action)
         (recovery_requires_spare ?r - recovery_action)
+        (recovery_requires_lub ?r - recovery_action)
         (recovery_clears_symptom ?r - recovery_action ?sy - symptom)
         (recovery_sets_symptom ?r - recovery_action ?sy - symptom)
 
         ;; ---------------- dynamic diagnostic state ----------------
+        ; --------- valve --------
         (shows ?c - component ?sy - symptom)
         (test_done ?t - diagnostic_test ?c - component)
         (possible_fault ?c - component ?f - fault)
@@ -58,11 +67,237 @@
         (recovery_done ?r - recovery_action ?c - component)
         (component_ok ?c - component)
 
+        ;--------- panel -------
+        (panel_jammed ?p - panel)
+        (panel_free ?p - panel)
+        (moving_panel ?p - panel)
+        (recovering_jam ?p - panel)
+        (covers ?p - panel ?t - tank)
+        (panel_open ?p - panel)
+        (opening_panel ?p - panel)
+        (closing_panel ?p - panel)
+
+        ;------------------ robot movement ----------------
+        (moving)
+        (moving-to ?l - location)
+
+        ;; ---------------- real world state ----------------
+
+        (high_current_manipulator)
+        (killed)
         (everything_ok)
     )
 
+    (:functions
+        ;------ valve ------
+        (pressure ?t - tank)
+        (flow_coefficient)
+        (R_ammonia)
+        (valve_opening ?v - valve)
+        (volume ?t - tank)
+        (mass ?t - tank)
+        (temperature ?t - tank)
 
-    ; --------------------------- Diagnostic reasoning -------------------------
+        (time-elapsed)
+        (duration-move)
+        (distance ?l1 ?l2 - location)
+        (speed)
+
+        ; ------ panel -----
+        (panel_position ?p - panel)
+        (panel_open_position ?p - panel)
+        (manipulator_current)
+        (jam_severity ?p - panel)
+        (beta_free ?p - panel)
+        (manipulator_current_limit)
+        (movement_speed)
+    )
+
+    ;======================== Physical modellation =========================
+    ;--------- Flow between tanks through a valve ----------   
+    
+    (:process tank_to_tank_flow
+        :parameters (?t_src - tank ?t_dest - tank ?v - valve)
+        :precondition (and 
+            (or (valve_connect ?v ?t_src ?t_dest)
+                (valve_connect ?v ?t_dest ?t_src))
+            
+            (> (valve_opening ?v) 0)             
+            (> (pressure ?t_src) (pressure ?t_dest))
+            
+            (> (volume ?t_src) 0)
+            (> (mass ?t_src) 0)
+        )
+        :effect (and 
+            
+            ;--------- Mass changes ----------------
+            ; Flow rate = k * (P_src - P_dest) * opening
+            
+            (decrease (mass ?t_src)
+                (* #t 
+                (* (flow_coefficient) 
+                    (* (- (pressure ?t_src) (pressure ?t_dest)) 
+                        (valve_opening ?v)))
+                )
+            )
+            
+            (increase (mass ?t_dest)
+                (* #t 
+                (* (flow_coefficient) 
+                    (* (- (pressure ?t_src) (pressure ?t_dest)) 
+                        (valve_opening ?v)))
+                )
+            )
+
+            ;--------- Pressure changes ----------------
+            ; Rate of pressure change = (R * T / V) * flow_rate
+            
+            (decrease (pressure ?t_src)
+                (* #t 
+                (* (/ (* (R_ammonia) (temperature ?t_src)) (volume ?t_src))
+                    (* (flow_coefficient) 
+                        (* (- (pressure ?t_src) (pressure ?t_dest)) 
+                            (valve_opening ?v))))
+                )
+            )
+            
+            (increase (pressure ?t_dest)
+                (* #t 
+                (* (/ (* (R_ammonia) (temperature ?t_dest)) (volume ?t_dest))
+                    (* (flow_coefficient) 
+                        (* (- (pressure ?t_src) (pressure ?t_dest)) 
+                            (valve_opening ?v))))
+                )
+            )
+        )
+    )
+
+    (:event pressure_equilized
+        :parameters (?t1 ?t2 - tank ?v - valve)
+        :precondition (and
+            (valve_connect ?v ?t1 ?t2)
+            (<= (- (pressure ?t1) (pressure ?t2)) 1.0)
+            (>= (- (pressure ?t1) (pressure ?t2)) -1.0)
+            (not (killed))
+        )
+        :effect (and
+            (killed)
+        )
+    )
+
+    ;------------- panel process ----------
+    (:process panel_opening_movement
+        :parameters (?p - panel)
+        :precondition (and 
+            (moving_panel ?p) 
+            (opening_panel ?p)
+            (panel_free ?p) 
+            (not (panel_jammed ?p))
+        )
+        :effect (and
+            (increase (panel_position ?p) (* #t (movement_speed)))
+        )
+    )
+
+    (:process panel_closing_movement
+        :parameters (?p - panel)
+        :precondition (and 
+            (moving_panel ?p) 
+            (closing_panel ?p)
+            (panel_free ?p) 
+            (not (panel_jammed ?p))
+        )
+        :effect (and
+            (decrease (panel_position ?p) (* #t (movement_speed)))
+        )
+    )
+
+    (:process motor_stall
+        :parameters (?p - panel)
+        :precondition (and 
+            (moving_panel ?p) 
+            (panel_jammed ?p)
+        )
+        :effect (and 
+            (increase (manipulator_current) (* #t 5.0)) 
+        )
+    )
+    
+    (:event alarm_panel_jammed
+        :parameters (?p - panel)
+        :precondition (and 
+            (moving_panel ?p)
+            (> (manipulator_current) (manipulator_current_limit))
+        )
+        :effect (and 
+            (high_current_manipulator)
+            (shows ?p no_movement)
+            (not (moving_panel ?p))
+            (not (opening_panel ?p))
+            (not (closing_panel ?p))
+        )
+    )
+
+    (:event panel_finished_opening
+        :parameters (?p - panel)
+        :precondition (and
+            (moving_panel ?p)
+            (opening_panel ?p)
+            (>= (panel_position ?p) (panel_open_position ?p))
+        )
+        :effect (and
+            (not (moving_panel ?p))
+            (not (opening_panel ?p))
+            (panel_open ?p)
+            (assign (panel_position ?p) (panel_open_position ?p))
+            (assign (manipulator_current) 0.0)
+        )
+    )
+
+    (:event panel_finished_closing
+        :parameters (?p - panel)
+        :precondition (and
+            (moving_panel ?p)
+            (closing_panel ?p)
+            (<= (panel_position ?p) 0.0)
+        )
+        :effect (and
+            (not (moving_panel ?p))
+            (not (closing_panel ?p))
+            (not (panel_open ?p))
+            (assign (panel_position ?p) 0.0)
+            (assign (manipulator_current) 0.0) 
+        )
+    )
+
+
+    (:process lub_recovery_process
+        :parameters (?p - panel)
+        :precondition (and
+            (recovering_jam ?p)
+        )
+        :effect (decrease (jam_severity ?p) (* #t (beta_free ?p)))
+    )
+
+    (:event jam_cleared
+        :parameters (?p - panel)
+        :precondition (and 
+            (recovering_jam ?p) 
+            (<= (jam_severity ?p) 0.0)
+        )
+        :effect (and 
+            (not (recovering_jam ?p))
+            (not (panel_jammed ?p))
+            (panel_free ?p)
+            (assign (manipulator_current) 0.0)
+            (not (high_current_manipulator))
+            (not (shows ?p no_movement))
+        )
+    )
+    
+
+
+    ; ========================= Diagnostic reasoning =========================
     ;-----------start-----------
     (:action run_diagnostic_valve_stuck
         :parameters (?v - valve ?t1 ?t2 - tank ?s1 ?s2 - sensor ?test - diagnostic_test ?f - fault ?sy - symptom)
@@ -75,8 +310,8 @@
             (valve_connect ?v ?t1 ?t2)
             (monitor ?s1 ?t1)
             (monitor ?s2 ?t2)
-            (or (not (test_requires_open ?test)) (is_open ?v))
-            (or (not (test_requires_closed ?test)) (not (is_open ?v)))
+            (or (not (test_requires_open ?test)) (is_open_valve ?v))
+            (or (not (test_requires_closed ?test)) (not (is_open_valve ?v)))
 
             (shows ?s1 ?sy)
             (shows ?s2 ?sy)
@@ -98,8 +333,8 @@
             (valve_connect ?v ?t1 ?t2)
             (monitor ?s ?t1)
             (monitor ?s_other ?t2)
-            (or (not (test_requires_open ?test)) (is_open ?v))
-            (or (not (test_requires_closed ?test)) (not (is_open ?v)))
+            (or (not (test_requires_open ?test)) (is_open_valve ?v))
+            (or (not (test_requires_closed ?test)) (not (is_open_valve ?v)))
 
             (shows ?s ?sy)
             (shows ?s_other ?sy_other)
@@ -120,7 +355,7 @@
             (test_requires_symptom ?test ?sy_faulty)
             (test_requires_neighbor ?test)
 
-            (is_open ?v) 
+            (is_open_valve ?v) 
             (valve_connect ?v ?t1 ?t2)
             (monitor ?s_faulty ?t1)
             (monitor ?s_ok ?t2)
@@ -153,6 +388,23 @@
     )
 
 
+    (:action run_diagnostic_panel_jam
+        :parameters (?p - panel ?test - diagnostic_test ?f - fault)
+        :precondition (and 
+            (applicable_test ?test ?p)
+            (not (test_done ?test ?p))
+            (test_indicates ?test ?f)
+            (high_current_manipulator)
+            (shows ?p no_movement)
+        )
+        :effect (and 
+            (possible_fault ?p ?f)
+            (test_done ?test ?p)
+            (not (moving_panel ?p))
+        )
+    )
+
+
     ;--------------clear-------------
     (:action run_diagnostic_valve_clear
         :parameters (?v - valve ?t1 ?t2 - tank ?s1 ?s2 - sensor ?test - diagnostic_test ?sy_fault - symptom)
@@ -165,8 +417,8 @@
             (monitor ?s1 ?t1)
             (monitor ?s2 ?t2)
 
-            (or (not (test_requires_open ?test)) (is_open ?v))
-            (or (not (test_requires_closed ?test)) (not (is_open ?v)))
+            (or (not (test_requires_open ?test)) (is_open_valve ?v))
+            (or (not (test_requires_closed ?test)) (not (is_open_valve ?v)))
 
             (not (shows ?s1 ?sy_fault))
             (not (shows ?s2 ?sy_fault))
@@ -184,7 +436,7 @@
             (test_requires_symptom ?test ?sy_fault)
             (test_requires_neighbor ?test)
             
-            ;(is_open ?v)
+            ;(is_open_valve ?v)
             (valve_connect ?v ?t1 ?t2)
             (monitor ?s_target ?t1)
             (monitor ?s_other ?t2)
@@ -222,6 +474,9 @@
             (not (confirmed_fault ?c ?f))
             (forall (?t - diagnostic_test)
                 (or (not (applicable_test ?t ?c)) (test_done ?t ?c)))
+            (not (exists (?f2 - fault) 
+                (and (possible_fault ?c ?f2) 
+                     (not (= ?f2 ?f)))))
         )
         :effect (and
             (confirmed_fault ?c ?f)
@@ -242,7 +497,7 @@
     )
 
 
-    ; ------------------ Recovery actions ------------------
+    ; ======================= Recovery actions ==========================
 
     (:action apply_mechanical_recovery
         :parameters (?r - recovery_action ?f - fault ?v - valve ?l - location ?tool - tool ?size_needed - size ?s1 ?s2 - sensor ?t1 ?t2 - tank ?sy_old ?sy_new - symptom)
@@ -250,13 +505,13 @@
             (confirmed_fault ?v ?f)
             (fixed_by ?r ?f)
             (recovery_requires_torque ?r)
-            (component_at ?v ?l)
+            (fixed_at ?v ?l)
             (robot-at ?l)
             (has_item ?tool)
             (can_torque ?tool)
             (has_size ?tool ?size_needed)
             (has_size ?v ?size_needed)
-            (or (not (recovery_requires_closed ?r)) (not (is_open ?v)))
+            (or (not (recovery_requires_closed ?r)) (not (is_open_valve ?v)))
             (valve_connect ?v ?t1 ?t2)
             (monitor ?s1 ?t1)
             (monitor ?s2 ?t2)
@@ -271,24 +526,32 @@
             (shows ?s1 ?sy_new)
             (not (shows ?s2 ?sy_old))
             (shows ?s2 ?sy_new)
+            (when (recovery_requires_closed ?r)
+                (and 
+                    (assign (valve_opening ?v) 0.0)
+                    (not (is_open_valve ?v))
+                )
+            )
             (forall (?t - diagnostic_test) (and (not (test_done ?t ?v))))
         )
     )
 
     (:action apply_replacement_recovery
-        :parameters (?r - recovery_action ?f - fault ?s_old ?s_new - sensor ?t - tank ?l - location ?sy_old ?sy_new - symptom)
+        :parameters (?r - recovery_action ?f - fault ?s_old ?s_new - sensor ?t - tank ?l - location ?p - panel ?sy_old ?sy_new - symptom)
         :precondition (and
             (confirmed_fault ?s_old ?f)
             (fixed_by ?r ?f)
             (recovery_requires_spare ?r)
             (robot-at ?l)
-            (tank_at ?t ?l)
+            (fixed_at ?t ?l)
             (monitor ?s_old ?t)
             (has_item ?s_new)
             (is_spare ?s_new)
+            (covers ?p ?t)
+            (panel_open ?p)
             (forall (?v - valve ?t_other - tank)
                 (or (not (valve_connect ?v ?t ?t_other))
-                    (not (is_open ?v))))
+                    (not (is_open_valve ?v))))
             (shows ?s_old ?sy_old)
             (recovery_clears_symptom ?r ?sy_old)
             (recovery_sets_symptom ?r ?sy_new)
@@ -309,6 +572,26 @@
         )
     )
 
+    (:action start_lub_recovery
+        :parameters (?p - panel ?l - location ?lub - item ?f - fault ?r - recovery_action)
+        :precondition (and
+            (confirmed_fault ?p ?f)
+            (fixed_by ?r ?f)
+            (recovery_requires_lub ?r)
+            (robot-at ?l)
+            (fixed_at ?p ?l)
+            (panel_jammed ?p)
+            (not (recovering_jam ?p))
+            (not (moving_panel ?p))
+            (has_item ?lub)
+            (can_lub ?lub)
+        )
+        :effect (and
+            (recovering_jam ?p)
+            (increase (beta_free ?p) 2.5)
+        )
+    )
+
     
     (:action verify_repair
         :parameters (?c - component ?r - recovery_action ?f - fault)
@@ -326,32 +609,60 @@
     )
 
 
-    ; ------------------ Robot actions ------------------
-    (:action move
-        :parameters (?l1 ?l2 - location)
-        :precondition (and
-            (robot-at ?l1)
-            (is_connected ?l1 ?l2)
-        )
-        :effect (and
-            (not (robot-at ?l1))
-            (robot-at ?l2)
-        )
+    ; ================ Robot actions =====================
+    ; ---------- moving ----------
+    (:action start-move
+    :parameters (?from ?to - location)
+    :precondition (and
+        (robot-at ?from)
+        (not (moving))
+        (is_connected ?from ?to)
+        (forall (?p - panel) (not (moving_panel ?p)))
     )
+    :effect (and
+        (not (robot-at ?from))
+        (moving)
+        (moving-to ?to)
+        (assign (time-elapsed) 0)
+        (assign (duration-move) (/ (distance ?from ?to) (speed)))
+    )
+    )
+
+    (:process during-move
+    :parameters ()
+    :precondition (moving)
+    :effect (increase (time-elapsed) (* #t 1))
+    )
+
+    (:event end-move
+    :parameters (?to - location)
+    :precondition (and
+        (moving-to ?to)
+        (>= (time-elapsed) (duration-move))
+    )
+    :effect (and
+        (not (moving))
+        (not (moving-to ?to))
+        (robot-at ?to)
+    )
+    )
+
+    ;------------------ Valve actions ------------------
 
     (:action close_valve
         :parameters (?v - valve ?l - location ?t1 ?t2 - tank)
         :precondition (and
             (robot-at ?l)
-            (component_at ?v ?l)
-            (is_open ?v)
+            (fixed_at ?v ?l)
+            (is_open_valve ?v)
             (hand_empty)
             (not (exists (?f - fault) (and (confirmed_fault ?v ?f) (fault_prevents_movement ?f))))
             (valve_connect ?v ?t1 ?t2)
             
         )
         :effect (and
-            (not (is_open ?v))
+            (not (is_open_valve ?v))
+            (assign (valve_opening ?v) 0.0)
         )
     )
 
@@ -359,9 +670,9 @@
         :parameters (?v - valve ?l - location ?t1 ?t2 - tank)
         :precondition (and
             (robot-at ?l)
-            (component_at ?v ?l)
+            (fixed_at ?v ?l)
             (valve_connect ?v ?t1 ?t2)
-            (not (is_open ?v))
+            (not (is_open_valve ?v))
             (hand_empty)
             (not (exists (?f - fault) 
                 (and 
@@ -378,12 +689,46 @@
             )
         )
         :effect (and
-            (is_open ?v)
+            (is_open_valve ?v)
+            (assign (valve_opening ?v) 1.0)
+        )
+    )
+
+    ;------------- Panel action ---------------
+
+    (:action start_open_panel
+        :parameters (?p - panel ?l - location)
+        :precondition (and
+            (robot-at ?l)
+            (fixed_at ?p ?l)
+            (not (panel_open ?p))
+            (not (moving_panel ?p))
+            (not (shows ?p no_movement))
+            (hand_empty)
+        )
+        :effect (and
+            (moving_panel ?p)
+            (opening_panel ?p)
+        )
+    )
+
+    (:action start_close_panel
+        :parameters (?p - panel ?l - location)
+        :precondition (and
+            (robot-at ?l)
+            (fixed_at ?p ?l)
+            (panel_open ?p)
+            (not (moving_panel ?p))
+            (hand_empty)
+        )
+        :effect (and
+            (moving_panel ?p)
+            (closing_panel ?p)
         )
     )
 
 
-    ;; -------- Manipulate object actions --------
+    ; -------- Manipulate object actions --------
     (:action pick_up_item
         :parameters (?item - item ?l - location)
         :precondition (and
@@ -403,7 +748,7 @@
         :precondition (and
             (has_item ?item)
             (robot-at ?l)
-            (warehause_location ?l)
+            (warehouse_location ?l)
         )
         :effect (and
             (not (has_item ?item))

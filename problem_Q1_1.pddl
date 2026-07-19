@@ -1,60 +1,67 @@
-(define (problem Q1) (:domain Orbital_domain_plus)
+(define (problem Problem_Q1_1) (:domain Orbital_domain_Q1)
 
 (:objects
     loc1 loc2 loc3 - location
-    valve1 - valve
-    tank1 tank2 - tank
-    sensor1 sensor2 spare_sensor1 - sensor
-    adjustable_wrench lubricant - tool
+    valve1 valve2 - valve
+    tank1 tank2 tank3 tank4 - tank
+    sensor1 sensor2 sensor3 sensor4 spare_sensor1 spare_sensor2 - sensor
+    adjustable_wrench - tool
     small medium large - size
-    panel1 panel2 - panel
 
     ;; --- diagnostic knowledge base objects ---
-    valve_stuck_fault valve_leak_fault sensor_crazy_fault sensor_dead_fault panel_jammed - fault
-    open_valve_test closed_valve_test sensor_self_test sensor_comparison_test panel_movement_test - diagnostic_test
+    valve_stuck_fault valve_leak_fault sensor_crazy_fault sensor_dead_fault - fault
+    pressure_changing pressure_stable erratic_reading - symptom
+    open_valve_test closed_valve_test sensor_self_test sensor_comparison_test - diagnostic_test
     unstuck_fix tighten_fix replace_fix - recovery_action
 )
 
 (:init
     (robot-at loc1)
-    (= (speed) 2.0)
-    (fixed_at valve1 loc2)
-    (fixed_at tank1 loc2) (fixed_at tank2 loc3)
-    (warehouse_location loc3)
+    (component_at valve1 loc2)
+    (component_at valve2 loc2)
+    (tank_at tank1 loc2) (tank_at tank2 loc3)
+    (tank_at tank3 loc1) (tank_at tank4 loc3)
+    (warehause_location loc3)
     (item_at spare_sensor1 loc3)
     (is_spare spare_sensor1)
-    (has_size valve1 small)
+    (item_at spare_sensor2 loc3)
+    (is_spare spare_sensor2)
+    (has_size valve1 small) (has_size valve2 large)
 
     (is_connected loc1 loc2) (is_connected loc2 loc1)
     (is_connected loc2 loc3) (is_connected loc3 loc2)
-    (= (distance loc1 loc2) 10.0) (= (distance loc2 loc1) 10.0)
-    (= (distance loc2 loc3) 10.0) (= (distance loc3 loc2) 10.0)
 
     (valve_connect valve1 tank1 tank2) (valve_connect valve1 tank2 tank1)
-    (covers panel1 tank1) (covers panel2 tank2)
-    (fixed_at panel1 loc2) (fixed_at panel2 loc3)
+    (valve_connect valve2 tank3 tank4) (valve_connect valve2 tank4 tank3)
 
     (monitor sensor1 tank1) (monitor sensor2 tank2)
+    (monitor sensor3 tank3) (monitor sensor4 tank4)
 
-    (is_open_valve valve1)
+    (is_open valve1)
+    ;(is_open valve2)
     
 
     (can_torque adjustable_wrench)
     (has_size adjustable_wrench medium)
     (is_adjustable adjustable_wrench)
     (in_toolbox adjustable_wrench)
-    (in_toolbox lubricant)
     (hand_empty)
 
     ;; ---------------- diagnostic knowledge base ----------------
     (applicable_test open_valve_test valve1)
+    (applicable_test closed_valve_test valve2)
     (applicable_test sensor_self_test sensor1)
     (applicable_test sensor_self_test sensor2)
+    (applicable_test sensor_self_test sensor3)
+    (applicable_test sensor_self_test sensor4)
     (applicable_test sensor_self_test spare_sensor1)
+    (applicable_test sensor_self_test spare_sensor2)
     (applicable_test sensor_comparison_test sensor1)
     (applicable_test sensor_comparison_test sensor2)
+    (applicable_test sensor_comparison_test sensor3)
+    (applicable_test sensor_comparison_test sensor4)
     (applicable_test sensor_comparison_test spare_sensor1)
-    (applicable_test panel_movement_test panel1)
+    (applicable_test sensor_comparison_test spare_sensor2)
 
     
     (test_requires_symptom open_valve_test pressure_stable)
@@ -93,51 +100,20 @@
     (recovery_clears_symptom replace_fix pressure_stable)
     (recovery_sets_symptom replace_fix pressure_changing)
 
-    ; ----------------- initial state valve ----------------
-    (= (valve_opening valve1) 1)
-    (= (flow_coefficient) 0.002)
-    (= (R_ammonia) 8.314)
-    
-    (= (pressure tank1) 100.0)
-    (= (volume tank1) 50.0)
-    (= (mass tank1) 20.0)
-    (= (temperature tank1) 293.0)
-
-    (shows sensor1 pressure_changing)
-    (shows sensor2 pressure_stable)
-
-    (= (pressure tank2) 50.0)
-    (= (volume tank2) 50.0)
-    (= (mass tank2) 20.0)
-    (= (temperature tank2) 293.0)
-
-    ; ------------------ initial state panel ----------------
-    (= (movement_speed) 5.0)
-    (= (manipulator_current) 0.0)
-    (= (manipulator_current_limit) 50.0)
-
-    (= (panel_position panel1) 0.0)
-    (= (panel_open_position panel1) 90.0)
-    (= (jam_severity panel1) 0.0)
-    (= (beta_free panel1) 0.0)
-    (panel_free panel1)
-
-    (= (panel_position panel2) 0.0)
-    (= (panel_open_position panel2) 90.0)
-    (= (jam_severity panel2) 0.0)
-    (= (beta_free panel2) 0.0)
-    (panel_jammed panel2)
+    ;; ---------------- observed symptoms ----------------
+    (shows sensor1 pressure_stable)
+    (shows sensor2 pressure_changing)
+    (shows sensor3 erratic_reading)
+    (shows sensor4 pressure_changing)
 
 )
 
 (:goal (and
     (everything_ok)
     (hand_empty)
-    (not (killed))
     (forall (?i - item) (or (not (in_toolbox ?i))
                             (= ?i adjustable_wrench)
     ))
-    (forall (?p - panel) (not (panel_open ?p)))
 ))
 
 )
