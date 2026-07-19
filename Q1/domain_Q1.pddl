@@ -22,7 +22,6 @@
         (monitor ?s - sensor ?t - tank)
         (is_open ?v - valve)
         (has_size ?obj - object ?sz - size)
-        (needs_isolation ?t - tank)
         (warehause_location ?l - location)
 
         ;; ---------------- manipulation ----------------
@@ -222,6 +221,9 @@
             (not (confirmed_fault ?c ?f))
             (forall (?t - diagnostic_test)
                 (or (not (applicable_test ?t ?c)) (test_done ?t ?c)))
+            (not (exists (?f2 - fault) 
+                (and (possible_fault ?c ?f2) 
+                     (not (= ?f2 ?f)))))
         )
         :effect (and
             (confirmed_fault ?c ?f)
@@ -300,7 +302,6 @@
             (monitor ?s_new ?t)
             (not (has_item ?s_new))
             (has_item ?s_old)
-            (not (needs_isolation ?t))
             (recovery_done ?r ?s_new)
             (forall (?t2 - diagnostic_test)
                 (and (not (test_done ?t2 ?s_old))))
