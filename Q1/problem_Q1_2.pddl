@@ -19,7 +19,7 @@
     (robot-at loc1)
     (component_at valve1 loc2)
     (component_at valve2 loc2)
-    (tank_at tank1 loc2) (tank_at tank2 loc3)
+    (tank_at tank1 loc1) (tank_at tank2 loc3)
     (tank_at tank3 loc1) (tank_at tank4 loc3)
     (warehause_location loc3)
     (item_at spare_sensor1 loc3)
@@ -103,8 +103,8 @@
     ;; ---------------- observed symptoms ----------------
     (shows sensor1 pressure_stable)
     (shows sensor2 pressure_changing)
-    (shows sensor3 erratic_reading)
-    (shows sensor4 pressure_changing)
+    (shows sensor3 pressure_changing)
+    (shows sensor4 erratic_reading)
 
 )
 

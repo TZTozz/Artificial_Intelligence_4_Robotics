@@ -14,15 +14,7 @@ The domain represents a robot performing maintenance on the exterior of an orbit
 
 Every maintenance task follows the same logical sequence:
 ```
-Observe symptoms
-    ↓
-Run diagnostic tests
-    ↓
-Confirm the fault
-    ↓
-Repair
-    ↓
-Verify
+Observe symptoms    ➝    Run diagnostic tests    ➝    Confirm the fault    ➝    Repair    ➝    Verify
 ```
 Verification is mandatory after every repair. The robot never simply assumes a fix worked, it has to re-test the component and confirm it has actually returned to a healthy state.
 
@@ -102,7 +94,13 @@ Q2 extends the classical model into PDDL+. The underlying logical reasoning bare
 
 ### Continuous Processes
 
-Unlike in Q1, the world in Q2 evolves on its own, independent of what the robot does — the robot has to plan around an environment that keeps changing. **Tank pressure equalisation** is modelled as a continuous process: whenever a valve is open and the tanks it connects have different pressures, the process keeps updating tank mass and pressure until equilibrium is reached, approximating real fluid dynamics without the computational cost of modelling it exactly. **Panel opening** is likewise continuous, a panel's position evolves over time through a movement process rather than flipping instantly between open and closed. **Lubrication recovery** works the same way: once initiated, jam severity decreases gradually, and only once it reaches zero does an event declare the panel operational again.
+Unlike in Q1, the world in Q2 evolves on its own, independent of what the robot does. The robot has to plan around an environment that keeps changing.
+
+**Tank pressure equalisation** is modelled as a continuous process: whenever a valve is open and the tanks it connects have different pressures, the process keeps updating tank mass and pressure until equilibrium is reached, approximating real fluid dynamics without the computational cost of modelling it exactly. 
+ 
+**Panel opening** is likewise continuous, a panel's position evolves over time through a movement process rather than flipping instantly between open and closed.
+ 
+**Lubrication recovery** works the same way: once initiated, jam severity decreases gradually, and only once it reaches zero does an event declare the panel operational again.
 
 ### Events
 
@@ -114,13 +112,21 @@ Q2 introduces numeric variables in three groups: tank physics (pressure and mass
 
 ### How Actions, Processes, and Events Interact
 
-The hybrid model splits responsibilities cleanly. Actions: move, open valve, repair sensor, start lubrication — represent decisions the robot makes. Processes — pressure equalisation, panel motion, lubrication progress — continuously evolve the world in the background. Events — pressure equalised, alarm activated, jam removed — fire automatically once a threshold is crossed. This mirrors how real hybrid control systems work: a controller issues commands while the physical plant it's controlling evolves continuously according to its own dynamics.
+The hybrid model splits responsibilities cleanly. 
+
+*Actions*: `move`, `open_valve`, `repair_sensor`, `start_lubrication` => represent decisions the robot makes.
+
+*Processes*: `pressure_equalisation`, `panel_motion`, `lubrication_progress` => continuously evolve the world in the background.
+
+*Events*: `pressure_equalised`, `alarm_activated`, `jam_removed` => fire automatically once a threshold is crossed. 
+
+This mirrors how real hybrid control systems work: a controller issues commands while the physical plant it's controlling evolves continuously according to its own dynamics.
 
 ## Why the Project Is Modular
 
 Modularity was a central design goal throughout, and it shows up in a few concrete ways.
 
-**Diagnostic knowledge is data-driven.** The diagnostic actions themselves are generic and contain no knowledge about individual faults — the actual relationships live in predicates like `applicable_test`, `test_requires_symptom`, `test_indicates`, and `unreliable_symptom`, all defined in the problem file. Adding a new fault, symptom, or diagnostic test is just a matter of adding facts; the planning operators never need to change.
+**Diagnostic knowledge is data-driven.** The diagnostic actions themselves are generic and contain no knowledge about individual faults, the actual relationships live in predicates like `applicable_test`, `test_requires_symptom`, `test_indicates`, and `unreliable_symptom`, all defined in the problem file. Adding a new fault, symptom, or diagnostic test is just a matter of adding facts. The planning operators never need to change.
 
 **Confirmation logic is generic.** `confirm_fault` and `rule_out_fault` only check whether all required tests have completed and whether exactly one (or zero) hypotheses remain. Because that check is expressed with quantified predicates, adding more diagnostic tests never requires touching the confirmation logic.
 
@@ -128,25 +134,21 @@ Modularity was a central design goal throughout, and it shows up in a few concre
 
 **Q2 extends Q1 without rewriting it.** Perhaps the clearest demonstration of the architecture's modularity is that almost the entire diagnostic system carries over unchanged from Q1 to Q2. PDDL+ simply layers continuous flow physics, timed movement, panel dynamics, and numeric reasoning on top of it, with only panel diagnosis and lubrication recovery added as genuinely new pieces. The confirmation, verification, and repair framework is fully reused.
 
-**Decision-making and physics are kept apart.** Robot decisions are represented as actions; continuous physical evolution as processes; automatic threshold behaviour as events — the same separation used in real hybrid robotic systems.
-
 ## Mathematical Models and Continuous Dynamics
 
 PDDL+ doesn't solve differential equations directly, so Q2 approximates real physical behaviour using simplified numeric relationships, chosen to keep the planning problem tractable while still capturing realistic qualitative behaviour.
 
-**Tank-to-tank flow** is modelled as a process that runs whenever a connecting valve is open and the two tanks have different pressures, using a simplified pressure-driven relationship, Q = k(P₁ − P₂), where Q is the flow rate and k is a constant flow coefficient. This stands in for something like Bernoulli's equation, trading physical precision for a model that still gets the qualitative behaviour — flow proportional to pressure difference — right.
+**Tank-to-tank flow** is modelled as a process that runs whenever a connecting valve is open and the two tanks have different pressures, using a simplified pressure-driven relationship, $Q = k(P_1 − P_2)$, where $Q$ is the flow rate and $k$ is a constant flow coefficient. This stands in for something like Bernoulli's equation, trading physical precision for a model that still gets the qualitative behaviour right.
 
-**Mass transfer** follows directly from that flow: over a small time interval, Δm = Q·Δt, so the source tank loses exactly what the destination tank gains, which keeps mass conserved throughout the simulation.
+**Mass transfer** follows directly from that flow: over a small time interval, $\Delta m = Q·\Delta t$, so the source tank loses exactly what the destination tank gains, which keeps mass conserved throughout the simulation.
 
-**Pressure** is assumed to scale linearly with stored mass, P = kₚ·m, which sidesteps the complexity of modelling gas compressibility while still producing realistic equalisation behaviour. The **pressure equilibrium event** watches for |P₁ − P₂| < ε and stops the flow process once the two pressures are close enough that no meaningful gradient remains.
+**Pressure** is assumed to scale linearly with stored mass, $ P = k_{p}·m $, which sidesteps the complexity of modelling gas compressibility while still producing realistic equalisation behaviour. The **pressure equilibrium event** watches for $|P_1 − P_2| < \varepsilon$ and stops the flow process once the two pressures are close enough that no meaningful gradient remains.
 
-**Robot motion** is timed rather than instantaneous: a movement's duration is t = d/v, where d is the path length and v is the robot's speed. A process increases elapsed travel time continuously until it reaches t, at which point a movement-completion event places the robot at its destination.
+**Robot motion** is timed rather than instantaneous: a movement's duration is $t = \frac{d}{v}$, where $d$ is the path length and $v$ is the robot's speed. A process increases elapsed travel time continuously until it reaches $t$, at which point a movement-completion event places the robot at its destination.
 
-**Panel opening** follows a similar pattern: the panel_position fluent evolves as position = position + speed·Δt until the panel reaches fully open or fully closed. If the panel is jammed, though, it can't move — instead the **motor stall model** has current increase as I = I + r·Δt, capturing how a stalled actuator behaves, and the **alarm activation** event fires once I ≥ I_limit, introducing the panel-jam symptom the planner can then diagnose.
+**Panel opening** follows a similar pattern: the `panel_position` fluent evolves as $position = position + speed·\Delta t$ until the panel reaches fully open or fully closed. If the panel is jammed, though, it can't move — instead the **motor stall model** has current increase as $I = I + r·\Delta t$, capturing how a stalled actuator behaves, and the **alarm activation** event fires once $I \geq I_{limit}$, introducing the panel-jam symptom the planner can then diagnose.
 
-**Lubrication recovery** reverses that process: severity = severity − r_lub·Δt, and once severity ≤ 0 an event removes the fault and restores normal operation.
-
-All of these equations are deliberately simplified linear approximations — the goal was never a high-fidelity physical simulation, just a model expressive enough to show pressure equalising, fluid flowing from high to low pressure, movement taking time, stalled motors overloading, and lubrication gradually restoring function, all within a framework compatible with PDDL+ processes and events.
+**Lubrication recovery** reverses that process: $severity = severity − r_{lub}·\Delta t$, and once severity $\leq 0$ an event removes the fault and restores normal operation.
 
 ## Q1 vs. Q2 at a Glance
 
@@ -162,4 +164,4 @@ All of these equations are deliberately simplified linear approximations — the
 
 ## Conclusion
 
-This project shows how planning can be used not just to reach a goal, but to actively gather information and reason under uncertainty. The classical PDDL model provides a modular framework for diagnosis, confirmation, repair, and verification built entirely on symbolic reasoning, and the PDDL+ extension preserves that architecture while adding continuous physical behaviour, numeric state, and environmental evolution through processes and events. The result is a system that keeps logical reasoning cleanly separated from physical simulation — modular, extensible, and a reasonable step toward modelling increasingly realistic autonomous maintenance missions.
+This project shows how planning can be used not just to reach a goal, but to actively gather information and reason under uncertainty. The classical PDDL model provides a modular framework for diagnosis, confirmation, repair, and verification built entirely on symbolic reasoning, and the PDDL+ extension preserves that architecture while adding continuous physical behaviour, numeric state, and environmental evolution through processes and events. The result is a system that keeps logical reasoning cleanly separated from physical simulation. It is modular, extensible, and a reasonable step toward modelling increasingly realistic autonomous maintenance missions.
