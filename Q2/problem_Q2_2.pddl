@@ -1,4 +1,4 @@
-(define (problem Q2_1) (:domain Orbital_domain_Q2)
+(define (problem Q2_2) (:domain Orbital_domain_Q2)
 
 (:objects
     loc1 loc2 loc3 - location
@@ -101,7 +101,7 @@
     (recovery_sets_symptom replace_fix pressure_changing)
 
     ; ----------------- initial state valve ----------------
-    (= (valve_opening valve1) 0.1)
+    (= (valve_opening valve1) 0.8)
     (= (flow_coefficient) 0.002)
     (= (R_ammonia) 8.314)
     

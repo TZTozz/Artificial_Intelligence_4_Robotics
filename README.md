@@ -134,15 +134,15 @@ Modularity was a central design goal throughout, and it shows up in a few concre
 
 **Q2 extends Q1 without rewriting it.** Perhaps the clearest demonstration of the architecture's modularity is that almost the entire diagnostic system carries over unchanged from Q1 to Q2. PDDL+ simply layers continuous flow physics, timed movement, panel dynamics, and numeric reasoning on top of it, with only panel diagnosis and lubrication recovery added as genuinely new pieces. The confirmation, verification, and repair framework is fully reused.
 
+
 ## Mathematical Models and Continuous Dynamics
 
 PDDL+ doesn't solve differential equations directly, so Q2 approximates real physical behaviour using simplified numeric relationships, chosen to keep the planning problem tractable while still capturing realistic qualitative behaviour.
 
-**Tank-to-tank flow** is modelled as a process that runs whenever a connecting valve is open and the two tanks have different pressures, using a simplified pressure-driven relationship, $Q = k(P_1 − P_2)$, where $Q$ is the flow rate and $k$ is a constant flow coefficient. This stands in for something like Bernoulli's equation, trading physical precision for a model that still gets the qualitative behaviour right.
+**Tank-to-tank mass flow** is modeled as a continuous process whenever a connecting valve is open and a pressure gradient exists. The **mass flow rate ($\dot{m}$)** is calculated using the formula: $\dot{m} = k \cdot (P_{src} - P_{dest}) \cdot o$. Here, $P_{src}$ and $P_{dest}$ are the source and destination pressures, $k$ is the `flow_coefficient` (a PDDL fluent), and $o$ is the `valve_opening` (another PDDL fluent). This is a refined pressure-driven relationship that stands in for something like Bernoulli's equation, trading physical precision for a model that gets the qualitative behaviour right while making the influence of the valve state and distinct parameters explicit.
 
-**Mass transfer** follows directly from that flow: over a small time interval, $\Delta m = Q·\Delta t$, so the source tank loses exactly what the destination tank gains, which keeps mass conserved throughout the simulation.
+**Pressure** is not assumed to scale linearly with stored mass. Instead, the continuous rate of change of pressure ($\dot{P}$) for each tank is derived directly from the **ideal gas law relationship ($PV = mRT$)**. Under assumptions of constant tank volume ($V$) and constant contents temperature ($T$), this simplifies to the differential equation $\dot{P} = \frac{RT}{V}\dot{m}$. This derived relationship allows pressure to update realistically based on mass flow rate and applied per-tank. The **pressure equilibrium event** watches for $|P_{src} - P_{dest}| < \varepsilon$ and stops the flow process once the two pressures are close enough that no meaningful gradient remains.
 
-**Pressure** is assumed to scale linearly with stored mass, $ P = k_{p}·m $, which sidesteps the complexity of modelling gas compressibility while still producing realistic equalisation behaviour. The **pressure equilibrium event** watches for $|P_1 − P_2| < \varepsilon$ and stops the flow process once the two pressures are close enough that no meaningful gradient remains.
 
 **Robot motion** is timed rather than instantaneous: a movement's duration is $t = \frac{d}{v}$, where $d$ is the path length and $v$ is the robot's speed. A process increases elapsed travel time continuously until it reaches $t$, at which point a movement-completion event places the robot at its destination.
 
