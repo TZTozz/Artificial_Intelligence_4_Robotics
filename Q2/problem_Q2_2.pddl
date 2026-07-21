@@ -27,8 +27,8 @@
 
     (is_connected loc1 loc2) (is_connected loc2 loc1)
     (is_connected loc2 loc3) (is_connected loc3 loc2)
-    (= (distance loc1 loc2) 10.0) (= (distance loc2 loc1) 10.0)
-    (= (distance loc2 loc3) 10.0) (= (distance loc3 loc2) 10.0)
+    (= (distance loc1 loc2) 20.0) (= (distance loc2 loc1) 20.0)
+    (= (distance loc2 loc3) 20.0) (= (distance loc3 loc2) 20.0)
 
     (valve_connect valve1 tank1 tank2) (valve_connect valve1 tank2 tank1)
     (covers panel1 tank1) (covers panel2 tank2)
@@ -102,7 +102,7 @@
 
     ; ----------------- initial state valve ----------------
     (= (valve_opening valve1) 0.8)
-    (= (flow_coefficient) 0.002)
+    (= (flow_coefficient) 0.005)
     (= (R_ammonia) 8.314)
     
     (= (pressure tank1) 100.0)
@@ -140,7 +140,7 @@
 (:goal (and
     (everything_ok)
     (hand_empty)
-    (not (killed))
+    (not (equalized))
     (forall (?i - item) (or (not (in_toolbox ?i))
                             (= ?i adjustable_wrench)
     ))

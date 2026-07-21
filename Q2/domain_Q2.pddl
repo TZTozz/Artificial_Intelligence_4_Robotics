@@ -28,7 +28,6 @@
         (monitor ?s - sensor ?t - tank)
         (is_open_valve ?v - valve)
         (has_size ?obj - object ?sz - size)
-        (needs_isolation ?t - tank)
         (warehouse_location ?l - location)
 
         ;; ---------------- manipulation ----------------
@@ -84,7 +83,7 @@
         ;; ---------------- real world state ----------------
 
         (high_current_manipulator)
-        (killed)
+        (equalized)
         (everything_ok)
     )
 
@@ -178,10 +177,10 @@
             (valve_connect ?v ?t1 ?t2)
             (<= (- (pressure ?t1) (pressure ?t2)) 1.0)
             (>= (- (pressure ?t1) (pressure ?t2)) -1.0)
-            (not (killed))
+            (not (equalized))
         )
         :effect (and
-            (killed)
+            (equalized)
         )
     )
 
@@ -549,6 +548,7 @@
             (is_spare ?s_new)
             (covers ?p ?t)
             (panel_open ?p)
+            (not (moving_panel ?p))
             (forall (?v - valve ?t_other - tank)
                 (or (not (valve_connect ?v ?t ?t_other))
                     (not (is_open_valve ?v))))
@@ -563,7 +563,6 @@
             (monitor ?s_new ?t)
             (not (has_item ?s_new))
             (has_item ?s_old)
-            (not (needs_isolation ?t))
             (recovery_done ?r ?s_new)
             (forall (?t2 - diagnostic_test)
                 (and (not (test_done ?t2 ?s_old))))

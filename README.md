@@ -14,9 +14,11 @@ The domain represents a robot performing maintenance on the exterior of an orbit
 
 Every maintenance task follows the same logical sequence:
 ```
-Observe symptoms    ➝    Run diagnostic tests    ➝    Confirm the fault    ➝    Repair    ➝    Verify
+Observe symptoms    ➝    Run diagnostic tests    ➝    Confirm the fault    ➝    Repair    ➝   Verify
 ```
 Verification is mandatory after every repair. The robot never simply assumes a fix worked, it has to re-test the component and confirm it has actually returned to a healthy state.
+
+The scenario is based on a real problem happened in 2010. During the STS-131 mission, a critical valve on a newly installed ammonia coolant tank got stuck in the closed position, which compromised half of the International Space Station's thermal cooling capabilities. Because of the severity of the malfunction, NASA heavily considered adding an unplanned fourth spacewalk (EVA) and extending the shuttle's mission to manually fix the issue.
 
 ## Domain Objects
 
@@ -161,6 +163,24 @@ PDDL+ doesn't solve differential equations directly, so Q2 approximates real phy
 | Diagnosis only | Diagnosis + physical simulation |
 | Discrete movement | Continuous movement |
 | No autonomous evolution | Processes and events change the world independently |
+
+## Technical discussion
+**Limitations of Classical PDDL**
+Classical PDDL assumes a fully observable world, making it unsuitable for realistic diagnosis. The predicates `possible_fault`, `confirmed_fault`, and `shows` simulate uncertainty, but the true fault is still explicitly encoded in the problem definition rather than hidden from the planner. Classical PDDL also lacks support for exogenous events, whereas PDDL+ allows faults and physical processes to evolve autonomously without planner intervention.
+
+**Diagnostic action Vs  goal-achieving actions**
+| | *Diagnostic actions* (`run_test`-style, `confirm_fault`, `rule_out_fault`) | *Goal-achieving / repair actions* (`open_valve`, `mechanical_recovery`, `start_lub_recovery`, `verify_repair`) |
+| --- | --- | --- |
+| Effect on physical world | None, they only add/remove conceptual predicates | Change actual component state |
+| Purpose | Reduce uncertainty / narrow hypothesis space | Move the world toward the goal |
+| Preconditions | Depend on symptoms already observed, not on the true fault | Gated by `confirmed_fault` |
+| Reversibility | Effectively monotonic — knowledge only accumulates | Physically consequential and sometimes constrained (e.g. can't `open_valve` if a movement-preventing fault is possible) |
+
+**Fault Progression and Planning Urgency**
+Fault progression introduces urgency because continuous processes can drive the system toward irreversible failure. For example, pressure equalisation caused by a stuck valve eventually triggers a failure event that ends the mission. Consequently, the planner must complete diagnosis, repair, and verification before these critical thresholds are reached, making time an essential planning resource.
+
+**Toward a POMDP-Based Model**
+A natural extension is to model diagnosis as a POMDP, replacing symbolic fault predicates with a probabilistic belief state over possible faults. Observations would become noisy rather than deterministic, continuous fault progression could be stochastic, and repair actions could have uncertain outcomes. Instead of producing a single plan, the planner would compute a policy that balances information gathering, repair costs, and the risk of failure under uncertainty.
 
 ## Conclusion
 

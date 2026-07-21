@@ -25,8 +25,8 @@ import matplotlib.pyplot as plt
 # ---------------------------------------------------------------------
 # Initial state / constants (from the problem file)
 # ---------------------------------------------------------------------
-valve_opening = 0.1
-flow_coefficient = 0.002
+valve_opening = 0.8
+flow_coefficient = 0.005
 R_ammonia = 8.314
 
 P1_0 = 100.0     # pressure tank1
@@ -43,7 +43,7 @@ T2 = 293.0       # temperature tank2 (assumed constant)
 # Simulation settings
 # ---------------------------------------------------------------------
 dt = 0.01        # integration time step
-t_max = 350.0   # safety cap on simulated time
+t_max = 150.0   # safety cap on simulated time
 
 # ---------------------------------------------------------------------
 # Euler integration of the process's continuous effects
@@ -114,7 +114,7 @@ else:
 
 ax.set_xlabel("Time (s)")
 ax.set_ylabel("Pressure")
-ax.set_title("Tank-to-tank flow through valve1 0.1: pressure over time")
+ax.set_title("Tank-to-tank flow through valve1 0.8: pressure over time")
 ax.grid(True, alpha=0.3)
 ax.legend()
 
