@@ -2,6 +2,18 @@
 
 ### Classical PDDL and PDDL+ Planning for Autonomous Orbital Maintenance
 
+# How to run
+For problem_Q1_1 and problem_Q1_2 use: `bfws-ffparser` 
+
+For problem_Q2_1 use:
+```
+java -jar Planner/enhsp-20.jar -o Q2/domain_Q2.pddl -f Q2/problem_Q2_1.pddl -planner sat-hmrph
+```
+For problem_Q2_2 use:
+```
+java -jar Planner/enhsp-20.jar -o Q2/domain_Q2.pddl -f Q2/problem_Q2_2.pddl -planner sat-hmrph
+```
+
 ## Overview
 
 This project models an autonomous orbital maintenance mission in which a robotic maintenance unit must diagnose and recover from faults occurring on an external spacecraft platform. Rather than treating planning as the pursuit of a single known goal state, the project centers on **diagnosis-oriented planning**: the robot does not initially know what is wrong with the system, and must actively gather information through diagnostic procedures before it can select an appropriate recovery action.
@@ -14,11 +26,9 @@ The domain represents a robot performing maintenance on the exterior of an orbit
 
 Every maintenance task follows the same logical sequence:
 ```
-Observe symptoms    ➝    Run diagnostic tests    ➝    Confirm the fault    ➝    Repair    ➝   Verify
+Observe symptoms    ➝   Run diagnostic tests    ➝   Confirm the fault    ➝   Repair    ➝   Verify
 ```
 Verification is mandatory after every repair. The robot never simply assumes a fix worked, it has to re-test the component and confirm it has actually returned to a healthy state.
-
-The scenario is based on a real problem happened in 2010. During the STS-131 mission, a critical valve on a newly installed ammonia coolant tank got stuck in the closed position, which compromised half of the International Space Station's thermal cooling capabilities. Because of the severity of the malfunction, NASA heavily considered adding an unplanned fourth spacewalk (EVA) and extending the shuttle's mission to manually fix the issue.
 
 ## Domain Objects
 
@@ -46,8 +56,7 @@ A **stuck valve** is inferred when the valve is open but both of its neighbourin
 
 A **leaking valve** is inferred when the valve is closed but neighbouring sensors report changing pressure. Pressure shouldn't equalise across a closed valve, so any equalisation points to an unwanted leak. Recovery here is also mechanical.
 
-A **sensor fault** shows up when a sensor’s readings disagree with those of neighbouring sensors or when it produces erratic values. A sensor is considered faulty only if it continuously reports a constant pressure value or generates inconsistent readings. However, a stable pressure reading alone is not sufficient to confirm a fault; it must also be contradicted by the measurements from adjacent sensors.
-In the case of a stable pressure condition, only one sensor per system is assumed to be faulty. Recovery consists of replacing the faulty sensor with a spare unit.
+A **sensor fault** is inferred when a pressure sensor either produces erratic readings or reports a stable pressure that contradicts the measurements of neighbouring sensors. Under the assumptions of this model, a sensor that observes a changing pressure is considered to be operating correctly. Because diagnosis is performed over a relatively short time horizon, gradual sensor drift is neglected, so a sensor capable of tracking pressure changes is assumed to be functioning normally.
 
 **Panel jams**, introduced in Q2, occur during the opening operation of an inspection panel. Instead of moving as expected, the motor stalls, causing its current consumption to increase continuously until the alarm threshold is reached. Recovery consists of performing a lubrication procedure to gradually release the jam and restore normal operation.
 
@@ -67,11 +76,11 @@ None of these rules are hardcoded into the planner itself, they emerge from rela
 
 The first domain is built in basic PDDL, the entire reasoning process is carried by predicates.
 
-The scenario of the valve stuck is based on a real problem happened in 2010 on the International Space Station's (ISS). During the STS-131 mission, a critical valve on a newly installed ammonia coolant tank got stuck in the closed position, which compromised half of the International Space Station's thermal cooling capabilities. Because of the severity of the malfunction, NASA heavily considered adding an unplanned fourth spacewalk (EVA) and extending the shuttle's mission to manually fix the issue.  
+The stuck-valve scenario is based on a real incident that occurred in 2010 on the International Space Station's (ISS). During the STS-131 mission, a critical valve on a newly installed ammonia coolant tank got stuck in the closed position, which compromised half of the International Space Station's thermal cooling capabilities. Because of the severity of the malfunction, NASA heavily considered adding an unplanned fourth spacewalk (EVA) and extending the shuttle's mission to manually fix the issue.  
 
-The world itself is represented as a graph of connected locations, with valves connecting tanks, sensors monitoring tanks, and the robot carrying a toolboxe and repair tools. Movement happens across that location graph.
+The world itself is represented as a graph of connected locations, with valves connecting tanks, sensors monitoring tanks, and the robot carrying a toolbox and repair tools. Movement happens across that location graph.
 
-One of the more important design decisions was to cleanly separate **domain knowledge** from **world state**. 
+One of the most important design decisions was to cleanly separate **domain knowledge** from **world state**. 
 Static knowledge, facts about how diagnosis works, such as which tests apply to which component, which symptoms a test requires, which faults a given result indicates, and which observations are considered unreliable, never changes during planning. Dynamic knowledge, observed symptoms, completed tests, possible and confirmed faults, repaired components, evolves as the plan unfolds. Keeping these apart is what makes the model as extensible as it is.
 
 ### Diagnostic Actions
@@ -80,7 +89,7 @@ Rather than writing a custom action for every possible fault, the domain relies 
 
 ### Confirmation Phase
 
-Once all required tests for a component have run, two generic actions decide the outcome. `confirm_fault` fires when every applicable test has completed and exactly one possible fault remains. This is to avoid to fix a problem that is not real. `rule_out_fault` fires when every applicable test has completed and no fault hypothesis remains, marking the component healthy instead. Both actions rely on universal quantifiers, so they adapt automatically to any number of tests without needing to be rewritten.
+Once all required tests for a component have run, two generic actions decide the outcome. `confirm_fault` fires when every applicable test has completed and exactly one possible fault remains. This prevents repairing a fault that does not actually exist. `rule_out_fault` fires when every applicable test has completed and no fault hypothesis remains, marking the component healthy instead. Both actions rely on universal quantifiers, so they adapt automatically to any number of tests without needing to be rewritten.
 
 ### Recovery
 
@@ -88,7 +97,7 @@ Repair is intentionally kept separate from diagnosis, and is handled by two gene
 
 ### Verification
 
-Repair on its own isn't treated as sufficient, diagnostic tests have to be repeated afterward, and only successful re-testing lets the component be marked operational. This mirrors how real maintenance procedures work, and it means the plan can never simply assume a repair succeeded.
+Repair on its own is not sufficient; diagnostic tests must be repeated afterward. Only successful re-testing lets the component be marked operational. This mirrors how real maintenance procedures work, and it means the plan can never simply assume a repair succeeded.
 
 ## Q2 — PDDL+ Design Choices
 
@@ -96,7 +105,7 @@ Q2 extends the classical model into PDDL+. The underlying logical reasoning bare
 
 ### Continuous Processes
 
-Unlike in Q1, the world in Q2 evolves on its own, independent of what the robot does. The robot has to plan around an environment that keeps changing.
+Unlike in Q1, the world in Q2 evolves on its own, independently of what the robot does. The robot has to plan around an environment that keeps changing.
 
 **Tank pressure equalisation** is modelled as a continuous process: whenever a valve is open and the tanks it connects have different pressures, the process keeps updating tank mass and pressure until equilibrium is reached, approximating real fluid dynamics without the computational cost of modelling it exactly. 
  
@@ -106,7 +115,7 @@ Unlike in Q1, the world in Q2 evolves on its own, independent of what the robot 
 
 ### Events
 
-Events are changes that happen automatically once a condition becomes true and, unlike actions, they're never chosen by the planner. Three events do the work here: pressure equilibrium stops fluid flow once the pressure difference between two tanks becomes small enough; alarm activation fires when the motor current of the manipulator exceeds a safety threshold, forcing the robot to respond; and jam cleared marks a panel operational once lubrication has reduced jam severity enough.
+Events are changes that happen automatically once a condition becomes true and, unlike actions, they are triggered automatically rather than selected by the planner. Three events do the work here: pressure equilibrium stops fluid flow once the pressure difference between two tanks becomes small enough; alarm activation fires when the motor current of the manipulator exceeds a safety threshold, forcing the robot to respond; and jam cleared marks a panel operational once lubrication has reduced jam severity enough.
 
 ### Numeric Fluents
 
@@ -152,7 +161,7 @@ PDDL+ doesn't solve differential equations directly, so Q2 approximates real phy
 
 **Lubrication recovery** reverses that process: $severity = severity − r_{lub}·\Delta t$, and once severity $\leq 0$ an event removes the fault and restores normal operation.
 
-## Q1 vs. Q2 at a Glance
+## Q1 vs. Q2
 
 | Q1 | Q2 |
 |----|----|
@@ -181,6 +190,22 @@ Fault progression introduces urgency because continuous processes can drive the 
 
 **Toward a POMDP-Based Model**
 A natural extension is to model diagnosis as a POMDP, replacing symbolic fault predicates with a probabilistic belief state over possible faults. Observations would become noisy rather than deterministic, continuous fault progression could be stochastic, and repair actions could have uncertain outcomes. Instead of producing a single plan, the planner would compute a policy that balances information gathering, repair costs, and the risk of failure under uncertainty.
+
+## Improvements
+### Fault severity classification
+Each fault type could be annotated with a danger or caution priority reflecting how urgently it must be addressed relative to its potential impact on mission safety. Rather than treating all confirmed faults as equally pressing, the planner would use these priority levels to schedule diagnosis and repair, addressing high-danger faults.
+
+### Autonomous symptom derivation from repeated sampling
+Currently, symptoms are supplied directly in the problem file as ground truth. A more realistic model would have the robot sample a given pressure sensor multiple times and derive the corresponding symptom itself rather than relying on a symptom predicate handed to it in advance. This solution has not been implemented due to the limitation of the reasoner.
+
+### Thermal escalation of panel jams
+Panel jams could be modelled as arising from thermal dilation rather than only from a mechanical blockage: as the panel or its housing heats up, differential expansion of the components can cause the mechanism to bind and stick, independent of the motor-stall/current model already in place. This would introduce a temperature fluent that rises over time (or under certain environmental/operational conditions) and a corresponding constraint that the panel can only resume normal opening once its temperature has dropped back within an acceptable range.
+
+### Active pressure restoration via a pump
+Beyond passive tank-to-tank equalisation through open valves, the model could introduce a pump component capable of actively restoring a tank to its nominal pressure. This would give the robot a genuine recovery action for pressure-related faults, rather than relying solely on the passive physics of flow between tanks.
+
+### Execution durations for all significant actions
+Timing is currently modelled only for movement and continuous processes (panel motion, lubrication, pressure equalisation). Extending explicit durations to other significant actions would make the temporal model more realistic and further close the gap between the simulated mission and real-world maintenance operations, where every action consumes non-trivial time.
 
 ## Conclusion
 
