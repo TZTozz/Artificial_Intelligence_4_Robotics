@@ -210,3 +210,8 @@ Timing is currently modelled only for movement and continuous processes (panel m
 ## Conclusion
 
 This project shows how planning can be used not just to reach a goal, but to actively gather information and reason under uncertainty. The classical PDDL model provides a modular framework for diagnosis, confirmation, repair, and verification built entirely on symbolic reasoning, and the PDDL+ extension preserves that architecture while adding continuous physical behaviour, numeric state, and environmental evolution through processes and events. The result is a system that keeps logical reasoning cleanly separated from physical simulation. It is modular, extensible, and a reasonable step toward modelling increasingly realistic autonomous maintenance missions.
+
+## Observation
+The submitted codes and report have been thoroughly reviewed by the teaching assistant, Omar Kashmar.
+
+
